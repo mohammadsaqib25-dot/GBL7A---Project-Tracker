@@ -149,8 +149,8 @@ td.pk{--c:var(--fsa);box-shadow:inset 4px 0 0 var(--c)}
 td.pk.MYD{--c:var(--myd)} td.pk.ML{--c:var(--ml)} td.pk.ALL{--c:var(--muted)}
 td.pk .cell{font-weight:800;font-stretch:72%;font-size:1rem;color:var(--c);padding-left:12px}
 td[data-v="High"],td[data-v="Critical"]{background:var(--redbg)}
-td[data-v="Medium"],td[data-v="Mitigating"],td[data-v="In progress"],td[data-v="Doing"]{background:var(--ambg)}
-td[data-v="Resolved"],td[data-v="Closed"],td[data-v="Done"]{background:var(--okbg)}
+td[data-v="Medium"],td[data-v="Mitigating"],td[data-v="In progress"],td[data-v="In Progress"],td[data-v="Doing"]{background:var(--ambg)}
+td[data-v="Resolved"],td[data-v="Closed"],td[data-v="Done"],td[data-v="Complete"]{background:var(--okbg)}
 td[data-v="Programme"],td[data-v="Cost"]{background:var(--ambg)}
 td[data-v="Programme and cost"]{background:var(--redbg)}
 td.od .cell{color:var(--late);font-weight:650}
@@ -228,6 +228,11 @@ td.dc{text-align:center}
 .grid td.done{background:var(--inbg)}
 .grid tr.over td.done{box-shadow:inset 0 0 0 2px var(--warn)}
 .cell.num{text-align:right;font-variant-numeric:tabular-nums}
+.ast{display:inline-block;padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700;white-space:nowrap}
+.ast.ontrack{background:var(--okbg);color:var(--ok)}
+.ast.slipping{background:var(--ambg);color:var(--warn)}
+.ast.issue{background:var(--redbg);color:var(--late)}
+.ast.closed{background:var(--soft);color:var(--muted)}
 .pin{display:flex;align-items:center}
 .pin .cell{flex:1;min-width:0}
 .pin span{padding-right:10px;color:var(--muted);font-size:.85rem}
@@ -313,6 +318,7 @@ tr.full .pcw .pbar i{background:var(--ok)} tr.full .pcw b{color:var(--ok)}
     <div class="tabs" role="tablist" id="tabs"></div>
     <div class="tools" id="tools">
       <input class="search" id="q" type="search" placeholder="Search ref, text or owner" aria-label="Search">
+      <button class="btn primary" id="listPdfBtn" hidden title="PDF of this tab, using the current package, search and closed-item filters">Download PDF</button>
       <label class="chk" id="hcwrap"><input type="checkbox" id="hideClosed"> Hide closed</label>
       <div class="seg" id="tlseg" role="group" aria-label="Timeline display" hidden><button data-tl="timeline">Timeline</button><button data-tl="table">Table</button></div>
     </div>
@@ -344,12 +350,10 @@ const SCHEMA={
     {k:"eot",t:"select",o:["Not required","To be assessed","Submitted","Granted","Rejected"]},
     {k:"mitigation",t:"area"},{k:"comments",t:"area"}
   ]},
-  action:{tab:"Actions",noun:"action",letter:"A",closed:"Closed",fields:[
-    {k:"pkg",t:"pkg"},{k:"title",t:"text"},{k:"owner",t:"text"},
+  action:{tab:"Action Tracker",noun:"action",letter:"A",closed:"Closed",fields:[
+    {k:"pkg",t:"pkg"},{k:"title",t:"text"},
     {k:"source",t:"select",o:["Progress meeting","Design review","Site walk","Client request","Email / RFI","Other"]},
-    {k:"raised",t:"date"},{k:"due",t:"date"},
-    {k:"priority",t:"select",o:["Low","Medium","High"]},
-    {k:"status",t:"select",o:["Open","In progress","Closed"]},
+    {k:"raised",t:"date"},{k:"owner",t:"text"},{k:"due",t:"date"},{k:"closedOn",t:"date"},
     {k:"notes",t:"area"}
   ]},
   event:{tab:"Timeline",noun:"event",letter:"E",closed:"__never__",fields:[
@@ -359,14 +363,18 @@ const SCHEMA={
     {k:"impact",t:"select",o:["None","Programme","Cost","Programme and cost"]},
     {k:"related",t:"text"},{k:"who",t:"text"},{k:"notes",t:"area"}
   ]},
-  todo:{tab:"To-do",noun:"task",letter:"T",closed:"Done",fields:[
-    {k:"pkg",t:"pkg"},{k:"title",t:"text"},{k:"owner",t:"text"},{k:"due",t:"date"},
+  todo:{tab:"To-do",noun:"task",letter:"T",closed:"Complete",fields:[
+    {k:"pkg",t:"pkg"},{k:"title",t:"text"},{k:"owner",t:"text"},{k:"company",t:"text"},{k:"due",t:"date"},
     {k:"priority",t:"select",o:["Low","Medium","High"]},
-    {k:"status",t:"select",o:["To do","Doing","Done"]},
+    {k:"status",t:"select",o:["Not started","In Progress","Complete"]},
     {k:"notes",t:"area"}
   ]}
 };
 (()=>{const e=SCHEMA.event;delete SCHEMA.event;SCHEMA.event=e})();
+const STATUS_MAP={todo:{"To do":"Not started","Doing":"In Progress","In progress":"In Progress","Done":"Complete"},action:{"In progress":"Open"}};
+function normItem(i){const m=STATUS_MAP[i.kind];if(m&&m[i.status])i.status=m[i.status];
+  if(i.kind==="action"&&i.status==="Closed"&&!i.closedOn){const d=i.updatedAt?new Date(i.updatedAt):new Date();i.closedOn=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+  return i}
 const opt=(kind,k)=>{const f=SCHEMA[kind].fields.find(f=>f.k===k);return (f&&f.o)||[]};
 const LS="pm-tracker-fsa-myd-ml-v1";
 
@@ -436,7 +444,14 @@ const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth
 const fmt=d=>{if(!d)return"";const x=new Date(d+"T00:00:00");return isNaN(x)?d:x.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"2-digit"})};
 const days=(a,b)=>(a&&b)?Math.round((Date.parse(b+"T00:00:00")-Date.parse(a+"T00:00:00"))/864e5):null;
 const newId=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2,10));
-const isClosed=i=>i.status===SCHEMA[i.kind].closed;
+const isClosed=i=>i.kind==="action"?!!i.closedOn:i.status===SCHEMA[i.kind].closed;
+const SLIP_DAYS=7;
+function actStatus(i){
+  if(i.closedOn)return "Closed";
+  if(!i.due||i.due>=today())return "On track";
+  return days(i.due,today())<=SLIP_DAYS?"Slipping":"Issue";
+}
+const astHtml=i=>{const s=actStatus(i);return `<span class="ast ${s.replace(/\s/g,"").toLowerCase()}">${s}</span>`};
 const overdue=i=>!isClosed(i)&&i.due&&i.due<today();
 const slip=i=>days(i.original,i.revised);
 const aN=w=>(/^[aeiou]/i.test(w)?"an ":"a ")+w;
@@ -460,17 +475,15 @@ const GRID={
     {k:"eot",l:"EOT claim",t:"select",w:138},
     {k:"mitigation",l:"Mitigation / recovery plan",t:"long",w:260},
     {k:"comments",l:"Comments",t:"long",w:220}],
-  action:[REF,PKG,
-    {k:"title",l:"Action",t:"long",w:280},
-    {k:"owner",l:"Owner",t:"text",w:140},
-    {k:"source",l:"Raised at",t:"select",w:156},
-    {k:"raised",l:"Date raised",t:"date",w:136},
-    {k:"due",l:"Due date",t:"date",w:136},
-    {k:"priority",l:"Priority",t:"select",w:100,vcol:1},
-    {k:"status",l:"Status",t:"select",w:122,vcol:1},
-    {k:"closedOn",l:"Date closed",t:"date",w:136},
-    {k:"_od",l:"Overdue",t:"ro",w:96,calc:odHtml},
-    {k:"notes",l:"Update / comments",t:"long",w:280}],
+  action:[{k:"ref",l:"Action No.",t:"ro",w:108},PKG,
+    {k:"title",l:"Description",t:"long",w:320},
+    {k:"source",l:"Raised in",t:"select",w:160},
+    {k:"raised",l:"Date Raised",t:"date",w:136},
+    {k:"owner",l:"Act Owner",t:"text",w:150},
+    {k:"due",l:"Due Date",t:"date",w:136},
+    {k:"closedOn",l:"Date Closed",t:"date",w:136},
+    {k:"_ast",l:"Status",t:"ro",w:112,calc:astHtml},
+    {k:"notes",l:"Comments/Response",t:"long",w:320}],
   event:[REF,PKG,
     {k:"date",l:"Date",t:"date",w:136},
     {k:"type",l:"Type",t:"select",w:176},
@@ -481,7 +494,8 @@ const GRID={
     {k:"notes",l:"Details / outcome",t:"long",w:320}],
   todo:[REF,PKG,
     {k:"title",l:"Task",t:"long",w:300},
-    {k:"owner",l:"Who",t:"text",w:130},
+    {k:"owner",l:"Owner",t:"text",w:140},
+    {k:"company",l:"Company",t:"text",w:150},
     {k:"due",l:"Due date",t:"date",w:136},
     {k:"priority",l:"Priority",t:"select",w:100,vcol:1},
     {k:"status",l:"Status",t:"select",w:110,vcol:1},
@@ -490,7 +504,7 @@ const GRID={
 };
 
 /* ---------- storage ---------- */
-function loadLocal(){try{const r=JSON.parse(localStorage.getItem(LS)||"null");if(r){(r.items||[]).forEach(i=>items.set(i.id,i));if(r.name)projectName=r.name;if(r.logo)projectLogo=r.logo;if(r.progress)progress=r.progress}}catch(e){}}
+function loadLocal(){try{const r=JSON.parse(localStorage.getItem(LS)||"null");if(r){(r.items||[]).forEach(i=>items.set(i.id,normItem(i)));if(r.name)projectName=r.name;if(r.logo)projectLogo=r.logo;if(r.progress)progress=r.progress}}catch(e){}}
 function saveLocal(){try{localStorage.setItem(LS,JSON.stringify({items:[...items.values()],name:projectName,logo:projectLogo,progress}))}catch(e){}}
 function failed(e){
   const c=e&&e.code;
@@ -572,6 +586,7 @@ function renderTabs(){
     +`<button class="tab" role="tab" data-k="progress" aria-selected="${view==="progress"}">Progress</button>`;
   $("tools").hidden=view==="progress";
   $("tlseg").hidden=view!=="event";$("hcwrap").hidden=view==="event";
+  $("listPdfBtn").hidden=!(downloads&&window.jspdf)||view==="progress";
   $("tlseg").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.tl===tlView()));
 }
 function renderName(){if(document.activeElement!==$("pname"))$("pname").textContent=projectName;document.title=projectName}
@@ -586,7 +601,8 @@ function renderFilterline(){
   if(pkgFilter!=="ALL")bits.push(`Showing ${pkgFilter} only. <button data-clear="pkg">Show all packages</button>`);
   if(q.trim())bits.push(`Matching "${esc(q.trim())}". <button data-clear="q">Clear search</button>`);
   if(view==="event"&&tlView()==="timeline")bits.push(all("event",pkgFilter).length?"Newest at the bottom. Click an event to edit it in the table.":"");
-  else if(!readOnly)bits.push(`Click any cell to type; changes save as you go. Enter moves down, Shift+Enter starts a new line. Type in the last row to add ${aN(SCHEMA[view].noun)}.`);
+  if(view==="action")bits.push(`Status is automatic: <b>On track</b> until the due date, <b>Slipping</b> up to ${SLIP_DAYS} days late, <b>Issue</b> after that, and <b>Closed</b> once a Date Closed is entered.`);
+  if(!readOnly&&!(view==="event"&&tlView()==="timeline"))bits.push(`Click any cell to type; changes save as you go. Enter moves down, Shift+Enter starts a new line. Type in the last row to add ${aN(SCHEMA[view].noun)}.`);
   $("filterline").innerHTML=bits.join(" ");
 }
 function renderChrome(){renderLanes();renderTabs();renderSync();renderName();renderLogo()}
@@ -597,7 +613,7 @@ function filtered(){
   const s=q.trim().toLowerCase();
   let list=all(view,pkgFilter);
   if(hideClosed)list=list.filter(i=>!isClosed(i));
-  if(s)list=list.filter(i=>[i.ref,i.title,i.owner,i.responsible,i.notes,i.mitigation,i.comments,i.cause,i.source,i.type,i.related,i.who].some(v=>v&&String(v).toLowerCase().includes(s)));
+  if(s)list=list.filter(i=>[i.ref,i.title,i.owner,i.responsible,i.notes,i.mitigation,i.comments,i.cause,i.source,i.type,i.related,i.who,i.company,i.kind==="action"?actStatus(i):""].some(v=>v&&String(v).toLowerCase().includes(s)));
   if(view==="event")return list.sort((a,b)=>(a.date||"9999").localeCompare(b.date||"9999")||(a.createdAt||0)-(b.createdAt||0));
   return list.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)||String(a.ref).localeCompare(String(b.ref)));
 }
@@ -987,6 +1003,111 @@ async function buildProgressPdf(pkg,P){
   doc.setProperties({title,subject:"Mechanical progress report",author:P.meta.preparedBy||"AirconMech",creator:"AirconMech project tracker"});
   return {buf:doc.output("arraybuffer"),fits,base};
 }
+/* ---------- PDF of the Delays, Actions, To-do and Timeline tabs ---------- */
+const dShort=v=>{const d=iso(v)||v;const m=String(d||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?`${m[3]}/${m[2]}/${m[1].slice(2)}`:String(d||"")};
+const pkgShort=v=>v==="ALL"?"All":String(v||"");
+const LIST_PDF={
+  delay:{title:"Delay Register",
+    cols:[["Ref",16],["Pkg",12],["Delay",46],["Cause",26],["Impact",15],["Planned",16],["Forecast",16],["Slip",12,"r"],["Responsible",24],["Status",18],["EOT claim",20],["Mitigation / comments",56]],
+    row:i=>{const sl=slip(i);return [i.ref,pkgShort(i.pkg),i.title,i.cause,i.impact,dShort(i.original),dShort(i.revised),sl==null?"":(sl>0?"+":"")+sl+" d",i.responsible,i.status,i.eot,[i.mitigation,i.comments?"Comments: "+i.comments:""].filter(Boolean).join("\n")]},
+    tone:(i,c)=>(c===7&&slip(i)>0)||(c===4&&(i.impact==="High"||i.impact==="Critical"))?"red":null,
+    summary:L=>{const o=L.filter(i=>!isClosed(i)),lg=o.reduce((m,i)=>Math.max(m,slip(i)||0),0);
+      return [["Open delays",o.length],["High / critical open",o.filter(i=>i.impact==="High"||i.impact==="Critical").length],["Longest open slip",lg?lg+" day"+(lg===1?"":"s"):"None"],["EOT claims pending",L.filter(i=>i.eot==="To be assessed"||i.eot==="Submitted").length]]}},
+  action:{title:"Action Tracker",
+    cols:[["Action No.",20],["Package",15],["Description",66],["Raised in",26],["Date raised",17],["Act owner",28],["Due date",20],["Date closed",18],["Status",17],["Comments / response",50]],
+    row:i=>[i.ref,pkgShort(i.pkg),i.title,i.source,dShort(i.raised),i.owner,i.due?dShort(i.due)+(overdue(i)?"\n"+days(i.due,today())+" d late":""):"",dShort(i.closedOn),actStatus(i),i.notes],
+    tone:(i,c)=>{if(c===6&&overdue(i))return "red";if(c!==8)return null;const st=actStatus(i);return st==="Issue"?"red":st==="Slipping"?"amber":st==="On track"?"green":null},
+    summary:L=>[["On track",L.filter(i=>actStatus(i)==="On track").length],["Slipping",L.filter(i=>actStatus(i)==="Slipping").length],["Issue",L.filter(i=>actStatus(i)==="Issue").length],["Closed",L.filter(isClosed).length]]},
+  todo:{title:"To-Do List",
+    cols:[["Ref",16],["Pkg",12],["Task",80],["Owner",28],["Company",28],["Due",20],["Priority",15],["Status",20],["Notes",58]],
+    row:i=>[i.ref,pkgShort(i.pkg),i.title,i.owner,i.company,i.due?dShort(i.due)+(overdue(i)?"\n"+days(i.due,today())+" d late":""):"",i.priority,i.status,i.notes],
+    tone:(i,c)=>(c===5&&overdue(i))?"red":null,
+    summary:L=>[["To-dos left",L.filter(i=>!isClosed(i)).length],["Overdue",L.filter(overdue).length],["Complete",L.filter(isClosed).length]]},
+  event:{title:"Project Timeline",
+    cols:[["Ref",18],["Pkg",13],["Date",17],["Type",30],["Event",70],["Impact",27],["Related ref",22],["Who",26],["Details / outcome",54]],
+    row:i=>[i.ref,pkgShort(i.pkg),dShort(i.date),i.type,i.title,i.impact&&i.impact!=="None"?i.impact:"",i.related,i.who,i.notes],
+    tone:(i,c)=>c===5&&i.impact&&i.impact!=="None"?"red":null,
+    summary:L=>{const d=L.map(i=>i.date).filter(Boolean).sort();
+      return [["Events recorded",L.length],["With programme or cost impact",L.filter(i=>i.impact&&i.impact!=="None").length],["Period covered",d.length?dShort(d[0])+" to "+dShort(d[d.length-1]):"–"]]}}
+};
+async function buildListPdf(kind,list,filterText){
+  const {jsPDF}=window.jspdf, cfg=LIST_PDF[kind];
+  const doc=new jsPDF({unit:"mm",format:"a4",orientation:"landscape",compress:true});
+  const W=297,H=210,M=10,CW=W-2*M,BOTTOM=H-M-6;
+  const PUR=[131,47,132],GOLD=[251,185,0],LAV=[239,227,240],INK=[34,21,42],MUT=[120,108,125],LINE=[205,190,206],WHITE=[255,255,255],RED=[179,53,46],ZEBRA=[250,247,250];
+  const logo=await logoForPdf();
+  const fs=7.4, lh=fs*0.3528*1.2, pad=1.3, px=1.4;
+  const F=(size,bold,c)=>{doc.setFont("helvetica",bold?"bold":"normal");doc.setFontSize(size);doc.setTextColor(...c)};
+  const T=(t,x,y,o)=>doc.text(t,x,y,Object.assign({baseline:"top",lineHeightFactor:1.2},o||{}));
+  const rect=(x,y,w,h,fill,stroke)=>{if(fill){doc.setFillColor(...fill);doc.rect(x,y,w,h,"F")}if(stroke){doc.setDrawColor(...LINE);doc.setLineWidth(0.15);doc.rect(x,y,w,h,"S")}};
+  const wrap=(t,w)=>doc.splitTextToSize(String(t==null?"":t),Math.max(w,3));
+  let y=M;
+  // first-page header
+  const hb=21;rect(M,y,CW,hb,PUR);rect(M,y+hb,CW,1.2,GOLD);
+  const lH=hb-6,lW=Math.min(lH*logo.w/logo.h,52);doc.addImage(logo.data,logo.fmt,M+4,y+3,lW,lW*logo.h/logo.w);
+  const tx=M+4+lW+7;
+  F(15,true,WHITE);T(cfg.title,tx,y+4.2);
+  F(8.5,false,[246,228,247]);T(projectName||"Project tracker",tx,y+11.4);
+  F(7.5,false,[246,228,247]);T("Issued "+fmtDMY(today()),M+CW-4,y+4.6,{align:"right"});
+  if(filterText)T(filterText,M+CW-4,y+11.6,{align:"right"});
+  y+=hb+1.2+4;
+  // key figures
+  const sm=cfg.summary(list), cw=Math.min(62,CW/sm.length), ch=11.5;
+  sm.forEach(([lab,val],k)=>{const x=M+k*(cw+3);rect(x,y,cw,ch,LAV);rect(x,y,1.2,ch,PUR);
+    F(7,false,MUT);T(lab,x+4,y+2);F(11,true,INK);T(String(val),x+4,y+5.6)});
+  y+=ch+5;
+  const cols=cfg.cols, scale=CW/cols.reduce((a,c)=>a+c[1],0), widths=cols.map(c=>c[1]*scale);
+  const headRow=()=>{const h=lh+2*pad+0.6;let x=M;cols.forEach((c,k)=>{rect(x,y,widths[k],h,GOLD,true);F(fs,true,INK);
+      if(c[2]==="r")T(c[0],x+widths[k]-px,y+pad+0.3,{align:"right"});else T(c[0],x+px,y+pad+0.3);x+=widths[k]});y+=h};
+  const newPage=()=>{doc.addPage();y=M;const bh=8;rect(M,y,CW,bh,PUR);rect(M,y+bh,CW,0.8,GOLD);
+    F(9,true,WHITE);T(cfg.title+" (continued)",M+3,y+2.2);F(7.5,false,[246,228,247]);T(projectName||"",M+CW-3,y+2.6,{align:"right"});y+=bh+0.8+3;headRow()};
+  headRow();
+  let lastMonth=null, zebra=false;
+  list.forEach(i=>{
+    if(kind==="event"){const mk=i.date?i.date.slice(0,7):"none";
+      if(mk!==lastMonth){lastMonth=mk;const h=lh+2*pad;if(y+h+lh*2>BOTTOM)newPage();
+        rect(M,y,CW,h,LAV,true);F(fs,true,INK);T(mk==="none"?"No date":new Date(mk+"-01T00:00:00").toLocaleDateString("en-GB",{month:"long",year:"numeric"}),M+px,y+pad);y+=h;zebra=false}}
+    const vals=cfg.row(i);
+    const cells=vals.map((v,k)=>{F(fs,k===0||!!cfg.tone(i,k),INK);return wrap(v,widths[k]-2*px)});
+    const h=Math.max(...cells.map(c=>c.length),1)*lh+2*pad;
+    if(y+h>BOTTOM)newPage();
+    const closed=kind!=="event"&&isClosed(i);
+    let x=M;
+    cells.forEach((c,k)=>{
+      rect(x,y,widths[k],h,zebra?ZEBRA:null,true);
+      const tone=cfg.tone(i,k);
+      F(fs,k===0||!!tone,tone==="red"?RED:tone==="amber"?[176,104,0]:tone==="green"?[44,118,70]:(closed?MUT:INK));
+      if(cols[k][2]==="r")T(c,x+widths[k]-px,y+pad,{align:"right"});else T(c,x+px,y+pad);
+      x+=widths[k];
+    });
+    y+=h;zebra=!zebra;
+  });
+  const n=doc.getNumberOfPages();
+  for(let k=1;k<=n;k++){doc.setPage(k);F(7,false,MUT);
+    doc.text(["AirconMech",cfg.title,projectName].filter(Boolean).join("  |  "),M,H-M,{baseline:"bottom"});
+    doc.text(`Page ${k} of ${n}`,W-M,H-M,{align:"right",baseline:"bottom"})}
+  doc.setProperties({title:cfg.title+(projectName?" – "+projectName:""),author:"AirconMech",creator:"AirconMech project tracker"});
+  return doc.output("arraybuffer");
+}
+async function exportListPdf(){
+  if(view==="progress"||!downloads||!window.jspdf)return;
+  const list=filtered(), cfg=LIST_PDF[view];
+  if(!list.length){toast(`There are no ${SCHEMA[view].tab.toLowerCase()} entries to put in a PDF with these filters.`);return}
+  const bits=[pkgFilter==="ALL"?"All packages":pkgLabel(pkgFilter)];
+  if(q.trim())bits.push(`search "${q.trim()}"`);
+  if(hideClosed&&view!=="event")bits.push("closed items hidden");
+  const btn=$("listPdfBtn");btn.disabled=true;btn.textContent="Preparing PDF…";
+  try{
+    const buf=await buildListPdf(view,list,bits.join(", "));
+    const name=[projectName||"Project",cfg.title,pkgFilter==="ALL"?"":pkgLabel(pkgFilter),today()].filter(Boolean).join(" ")
+      .replace(/[\/\\]/g,"-").replace(/[–—]/g,"-").replace(/[^\w\-. ]+/g,"").replace(/\s+/g," ").trim()+".pdf";
+    await downloads.save({filename:name,data:buf});
+    toast(`${cfg.title} PDF saved.`);
+  }catch(e){if(!(e&&(e.code==="declined"||e.code==="cancelled")))toast("The PDF could not be created. Try again.")}
+  finally{btn.disabled=false;btn.textContent="Download PDF"}
+}
+$("listPdfBtn").addEventListener("click",exportListPdf);
+
 async function exportPdf(){
   const P=getProg(progPkg);if(!P||!downloads||!window.jspdf)return;
   const setBtn=(busy)=>{const b=$("pdfBtn");if(b){b.disabled=busy;b.textContent=busy?"Preparing PDF…":"Download PDF report"}};
@@ -1090,8 +1211,8 @@ async function exportCsv(){
   }
   const cols=GRID[view].filter(c=>c.k!=="_od"), list=filtered();
   const cell=v=>{v=v==null?"":String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
-  const val=(i,c)=>c.k==="_slip"?(slip(i)==null?"":slip(i)):i[c.k];
-  const noOd=view==="delay"||view==="event";
+  const val=(i,c)=>c.k==="_slip"?(slip(i)==null?"":slip(i)):c.k==="_ast"?actStatus(i):i[c.k];
+  const noOd=view!=="todo";
   const head=cols.map(c=>c.l).concat(noOd?[]:["Overdue"]);
   const rows=[head.map(cell).join(",")].concat(list.map(i=>cols.map(c=>cell(val(i,c))).concat(noOd?[]:[overdue(i)?"Overdue":""]).join(",")));
   const name=(projectName||"tracker").replace(/[^\w\- ]+/g,"").trim().replace(/\s+/g,"-")+"-"+SCHEMA[view].tab.toLowerCase().replace(/[^a-z]/g,"")+(pkgFilter==="ALL"?"":"-"+pkgFilter)+"-"+today()+".csv";
@@ -1102,9 +1223,10 @@ async function exportCsv(){
 /* ---------- Excel import / export ---------- */
 const XL={
   delay:{sheet:"Delay Log",map:{"Ref":"ref","Package":"pkg","Delay description":"title","Cause":"cause","Impact":"impact","Date identified":"identified","Responsible party":"responsible","Planned date":"original","Forecast date":"revised","Status":"status","EOT claim":"eot","Mitigation / recovery plan":"mitigation","Date closed":"closedOn","Comments":"comments"}},
-  action:{sheet:"Action Tracker",map:{"Ref":"ref","Package":"pkg","Action":"title","Owner":"owner","Raised at":"source","Date raised":"raised","Due date":"due","Priority":"priority","Status":"status","Date closed":"closedOn","Update / comments":"notes"}},
+  action:{sheet:"Action Tracker",map:{"Action No.":"ref","Package":"pkg","Description":"title","Raised in":"source","Date Raised":"raised","Act Owner":"owner","Due Date":"due","Date Closed":"closedOn","Status":"status","Comments/Response":"notes"},
+    alias:{"Ref":"ref","Action":"title","Owner":"owner","Raised at":"source","Date raised":"raised","Due date":"due","Update / comments":"notes","Date closed":"closedOn"}},
   event:{sheet:"Timeline",map:{"Ref":"ref","Package":"pkg","Date":"date","Type":"type","Event":"title","Impact":"impact","Related ref":"related","Who":"who","Details / outcome":"notes"}},
-  todo:{sheet:"To-Do List",map:{"Ref":"ref","Package":"pkg","Task":"title","Who":"owner","Due date":"due","Priority":"priority","Status":"status","Notes":"notes"}}
+  todo:{sheet:"To-Do List",map:{"Ref":"ref","Package":"pkg","Task":"title","Owner":"owner","Company":"company","Due date":"due","Priority":"priority","Status":"status","Notes":"notes"},alias:{"Who":"owner"}}
 };
 const DATEK=new Set(["identified","original","revised","closedOn","raised","due","date"]);
 const p2=n=>String(n).padStart(2,"0");
@@ -1185,9 +1307,9 @@ async function importXlsx(file){
   let added=0,updated=0,n=0;const out=[];const base=Date.now();
   for(const kind of Object.keys(XL)){
     const ws=wbk.Sheets[XL[kind].sheet];if(!ws)continue;
-    const map=XL[kind].map, titleHead=Object.keys(map).find(h=>map[h]==="title");
+    const map=Object.assign({},XL[kind].alias||{},XL[kind].map), titleHeads=Object.keys(map).filter(h=>map[h]==="title");
     const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:""});
-    const hi=rows.findIndex(r=>r.map(x=>String(x).trim()).includes(titleHead));if(hi<0)continue;
+    const hi=rows.findIndex(r=>r.map(x=>String(x).trim()).some(h=>titleHeads.includes(h)));if(hi<0)continue;
     const head=rows[hi].map(x=>String(x).trim());
     for(const r of rows.slice(hi+1)){
       const o={};head.forEach((h,c)=>{if(map[h])o[map[h]]=r[c]});
@@ -1198,10 +1320,11 @@ async function importXlsx(file){
       const ex=fref&&byRef.get(kind+"|"+fref);
       const it=ex?{...ex}:{id:newId(),kind,createdAt:base+(n++)};
       S.fields.forEach(f=>{if(f.t==="pkg")return;const v=o[f.k];it[f.k]=DATEK.has(f.k)?iso(v):String(v==null?"":v).trim()});
-      const sf=S.fields.find(f=>f.k==="status");if(sf&&!sf.o.includes(it.status))it.status=sf.o[0];
+      normItem(it);const sf=S.fields.find(f=>f.k==="status");if(sf&&!sf.o.includes(it.status))it.status=sf.o[0];
       it.pkg=pk;
       it.ref=ex?ex.ref:(fref||nextRef(kind,pk,it.id));
       if(o.closedOn)it.closedOn=iso(o.closedOn);
+      if(kind==="action"&&/^closed$/i.test(String(o.status||"").trim())&&!it.closedOn)it.closedOn=today();
       if(isClosed(it)&&!it.closedOn)it.closedOn=today();
       if(!isClosed(it))delete it.closedOn;
       it.updatedAt=Date.now();
@@ -1242,8 +1365,8 @@ async function exportXlsx(){
   for(const kind of Object.keys(XL)){
     const m=XL[kind].map, heads=Object.keys(m), keys=heads.map(h=>m[h]);
     const list=all(kind).sort(kind==="event"?(x,y)=>(x.date||"9999").localeCompare(y.date||"9999")||(x.createdAt||0)-(y.createdAt||0):(x,y)=>(x.createdAt||0)-(y.createdAt||0));
-    const ex=kind==="delay"?"Slip (days)":kind==="event"?null:"Overdue";
-    const rows=[ex?heads.concat(ex):heads].concat(list.map(i=>{const r=keys.map(k=>DATEK.has(k)?dt(i[k]):(k==="pkg"&&i.pkg==="ALL"?"All":(i[k]||"")));
+    const ex=kind==="delay"?"Slip (days)":kind==="todo"?"Overdue":null;
+    const rows=[ex?heads.concat(ex):heads].concat(list.map(i=>{const r=keys.map(k=>DATEK.has(k)?dt(i[k]):(k==="pkg"&&i.pkg==="ALL"?"All":(kind==="action"&&k==="status"?actStatus(i):(i[k]||""))));
       return ex?r.concat(kind==="delay"?(slip(i)==null?"":slip(i)):(overdue(i)?"Overdue":"")):r}));
     const ws=XLSX.utils.aoa_to_sheet(rows,{dateNF:"dd-mmm-yy"});
     ws["!cols"]=rows[0].map(h=>({wch:/description|^Action$|^Task$|plan|comments|Notes/i.test(h)?42:14}));
@@ -1347,7 +1470,7 @@ if(!(window.claude&&typeof window.claude.use==="function"))tryRepoLogo(["logo.sv
       }
     }
     if(snap.empty&&!migrated)return;
-    items=new Map();snap.docs.forEach(x=>{const v=x.data();if(v)items.set(x.id,{...v,id:x.id})});
+    items=new Map();snap.docs.forEach(x=>{const v=x.data();if(v)items.set(x.id,normItem({...v,id:x.id}))});
     render();
   },()=>{mode="local";db=null;toast("Live saving stopped. Changes now save on this device.");render()});
   const pendingProg=clone(progress);let pmig=false;
