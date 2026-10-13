@@ -127,11 +127,13 @@ select.cell:focus{background-color:var(--surface)}
 input[type="date"].cell{min-width:0;font-size:.86rem}
 .cell:disabled{cursor:default;opacity:1;-webkit-text-fill-color:var(--ink)}
 td.pk{--c:var(--fsa);box-shadow:inset 4px 0 0 var(--c)}
-td.pk.MYD{--c:var(--myd)} td.pk.ML{--c:var(--ml)}
+td.pk.MYD{--c:var(--myd)} td.pk.ML{--c:var(--ml)} td.pk.ALL{--c:var(--muted)}
 td.pk .cell{font-weight:800;font-stretch:72%;font-size:1rem;color:var(--c);padding-left:12px}
 td[data-v="High"],td[data-v="Critical"]{background:var(--redbg)}
 td[data-v="Medium"],td[data-v="Mitigating"],td[data-v="In progress"],td[data-v="Doing"]{background:var(--ambg)}
 td[data-v="Resolved"],td[data-v="Closed"],td[data-v="Done"]{background:var(--okbg)}
+td[data-v="Programme"],td[data-v="Cost"]{background:var(--ambg)}
+td[data-v="Programme and cost"]{background:var(--redbg)}
 td.od .cell{color:var(--late);font-weight:650}
 .grid tr.closed .cell,.grid tr.closed td.ro{color:var(--muted)}
 .grid tr.closed td:first-child{text-decoration:line-through;text-decoration-color:var(--line)}
@@ -145,6 +147,36 @@ td.dc{text-align:center}
 .del:hover{color:var(--late)}
 @media (hover:none){.del{opacity:.55}}
 .empty{padding:28px 20px;text-align:center;color:var(--muted)}
+
+/* Timeline */
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{border:0;background:var(--surface);padding:6px 14px;font-weight:600;cursor:pointer;color:var(--muted)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--brand);color:#fff}
+.tl{max-width:920px}
+.tlm{font-stretch:76%;font-weight:800;font-size:1.3rem;color:var(--accent);margin:20px 0 6px}
+.tlm:first-child{margin-top:4px}
+.tll{list-style:none;margin:0;padding:0;position:relative}
+.tll::before{content:"";position:absolute;left:61px;top:4px;bottom:4px;width:2px;background:var(--line)}
+.tli{--c:var(--fsa);position:relative;display:grid;grid-template-columns:44px 1fr;gap:34px;padding:5px 0;cursor:pointer;outline:none}
+.tli.MYD{--c:var(--myd)} .tli.ML{--c:var(--ml)} .tli.ALL{--c:var(--muted)}
+.tli::before{content:"";position:absolute;left:55px;top:17px;width:10px;height:10px;border-radius:50%;background:var(--c);border:2px solid var(--paper);box-sizing:content-box}
+.tld{text-align:right;line-height:1.05;padding-top:9px}
+.tld b{display:block;font-size:1.45rem;font-stretch:70%;font-weight:800}
+.tld span{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.tlc{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--c);border-radius:6px;padding:9px 12px 10px;transition:border-color .15s}
+.tli:hover .tlc,.tli:focus-visible .tlc{border-color:var(--c)}
+.tli:focus-visible .tlc{box-shadow:0 0 0 2px var(--focus)}
+.tlh{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font-size:.78rem;color:var(--muted)}
+.tlpk{font-weight:800;font-stretch:72%;font-size:.95rem;color:var(--c)}
+.tltype{font-weight:650;color:var(--ink)}
+.imp{font-size:.72rem;font-weight:700;border-radius:4px;padding:1px 7px;background:var(--ambg);color:var(--ink)}
+.imp.both{background:var(--redbg)}
+.tltitle{font-weight:650;margin-top:3px;font-size:.98rem}
+.tlc p{margin:4px 0 0;font-size:.9rem;white-space:pre-wrap;color:var(--ink)}
+.tlmeta{margin-top:6px;font-size:.78rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 14px}
+.tlempty{border:1.5px dashed var(--line);border-radius:8px;padding:44px 20px;text-align:center;color:var(--muted);background:var(--surface)}
+.tlempty button{margin-top:10px}
 
 /* Progress tracker */
 .ptop{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:2px 0 14px}
@@ -177,6 +209,26 @@ td.dc{text-align:center}
 .grid td.done{background:var(--inbg)}
 .grid tr.over td.done{box-shadow:inset 0 0 0 2px var(--warn)}
 .cell.num{text-align:right;font-variant-numeric:tabular-nums}
+.pin{display:flex;align-items:center}
+.pin .cell{flex:1;min-width:0}
+.pin span{padding-right:10px;color:var(--muted);font-size:.85rem}
+.grid tr.sec td .secno{display:inline-block;min-width:2.2em;color:var(--muted)}
+#progbox .tablebox{max-height:none}
+.secin{display:flex;align-items:center}
+.secin .cell{font-weight:750;padding:0;min-height:0;background:transparent;font-size:.88rem}
+.secin .cell:focus{outline-offset:2px}
+.cell.ref{font-weight:650}
+.grid td.acts{text-align:right;white-space:nowrap;padding:0 4px;vertical-align:middle}
+.grid tr.sec td.acts{padding:0 4px}
+.ra{border:0;background:none;color:var(--muted);cursor:pointer;padding:7px 5px;font-size:.76rem;font-weight:650;border-radius:4px;opacity:0}
+.ra.del{font-size:1.15rem;line-height:1}
+.grid tr:hover .ra,.grid tr:focus-within .ra,.ra:focus-visible{opacity:1}
+.ra:hover{color:var(--accent)} .ra.del:hover{color:var(--late)}
+@media (hover:none){.ra{opacity:.6}}
+.grid tr.addrow td{background:var(--newbg)}
+.grid tr.addrow td.ro{color:var(--muted);font-weight:400;text-align:center}
+.grid tr.addsec td{background:var(--newbg);border-top:1px solid var(--line)}
+.grid tr.addsec .cell{font-weight:650}
 .pcw{display:flex;align-items:center;gap:8px;padding:8px}
 .pcw .pbar{flex:1;height:8px;background:var(--soft);border-radius:4px;overflow:hidden}
 .pcw .pbar i{display:block;height:100%;background:var(--accent);border-radius:4px}
@@ -232,12 +284,14 @@ tr.full .pcw .pbar i{background:var(--ok)} tr.full .pcw b{color:var(--ok)}
     <div class="tabs" role="tablist" id="tabs"></div>
     <div class="tools" id="tools">
       <input class="search" id="q" type="search" placeholder="Search ref, text or owner" aria-label="Search">
-      <label class="chk"><input type="checkbox" id="hideClosed"> Hide closed</label>
+      <label class="chk" id="hcwrap"><input type="checkbox" id="hideClosed"> Hide closed</label>
+      <div class="seg" id="tlseg" role="group" aria-label="Timeline display" hidden><button data-tl="timeline">Timeline</button><button data-tl="table">Table</button></div>
     </div>
   </div>
   <p class="filterline" id="filterline"></p>
   <div class="tablebox" id="tablebox"></div>
   <div id="progbox" hidden></div>
+  <div id="tlbox" hidden></div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -248,7 +302,7 @@ tr.full .pcw .pbar i{background:var(--ok)} tr.full .pcw b{color:var(--ok)}
 "use strict";
 const PKGS=[
   {id:"FSA",sub:"Package 1"},
-  {id:"MYD",sub:"Package 2"},
+  {id:"MYD",sub:"Package 2, Variations",label:"MYD/Variations"},
   {id:"ML",sub:"Package 3, Machine Learning"}
 ];
 const SCHEMA={
@@ -269,6 +323,13 @@ const SCHEMA={
     {k:"status",t:"select",o:["Open","In progress","Closed"]},
     {k:"notes",t:"area"}
   ]},
+  event:{tab:"Timeline",noun:"event",letter:"E",closed:"__never__",fields:[
+    {k:"pkg",t:"pkg"},{k:"date",t:"date"},
+    {k:"type",t:"select",o:["Milestone","Site event","Meeting","Instruction / variation","Delivery","Inspection / test","Incident","Handover","Correspondence","Other"]},
+    {k:"title",t:"text"},
+    {k:"impact",t:"select",o:["None","Programme","Cost","Programme and cost"]},
+    {k:"related",t:"text"},{k:"who",t:"text"},{k:"notes",t:"area"}
+  ]},
   todo:{tab:"To-do",noun:"task",letter:"T",closed:"Done",fields:[
     {k:"pkg",t:"pkg"},{k:"title",t:"text"},{k:"owner",t:"text"},{k:"due",t:"date"},
     {k:"priority",t:"select",o:["Low","Medium","High"]},
@@ -276,6 +337,7 @@ const SCHEMA={
     {k:"notes",t:"area"}
   ]}
 };
+(()=>{const e=SCHEMA.event;delete SCHEMA.event;SCHEMA.event=e})();
 const opt=(kind,k)=>{const f=SCHEMA[kind].fields.find(f=>f.k===k);return (f&&f.o)||[]};
 const LS="pm-tracker-fsa-myd-ml-v1";
 
@@ -302,15 +364,33 @@ const PROG_TEMPLATE={
       {name:"Testing",lines:[L(10475,"Hydrostatic test – PCWS/PCWR","Row",177),L(10476,"Pneumatic test – manifold piping","Row",177)]},
       {name:"Logistics",lines:[L(10484,"Lift & shift, loading bay to rack","Row",177)]}
     ],
-    issues:"",look:{planned:"",deliveries:"",tests:""}}
+    issues:"",look:{planned:"",deliveries:"",tests:""}},
+  FSA:{mode:"pct",
+    meta:{project:"FSA & DCH Plumbing",contractor:"AirconMech – Mechanical Install",scope:"FSA & DCH Plumbing",period:"",reportDate:"",preparedBy:"Mohammad Saqib"},
+    sections:[{sor:"1",name:"FSA & DCH Plumbing",lines:[["1.1","Project Management, H&S, Supervision, PPE",1],
+      ["1.2","Mains Water Supply"],["1.3","Boosted Cold Water Supply"],["1.4","Treated Non Potable Water Supply"],["1.5","Non Treated Potable Water Supply"],
+      ["1.6","FCU Condensate"],["1.7","Soil Vent Stacks"],["1.8","FSA Waste Pipework"],["1.9","DCH Waste Pipework"],["1.10","DCH Humidifier Pipework"],
+      ["1.11","DCH Water Services"],["1.12","Lagging & Cladding"],["1.13","Valves (FSA & DCH)"],["1.14","Pressure Testing"],
+      ["1.15","Sanityware Final Connections"],["1.16","Plant Items Installation Only"],["1.17","Sterilisation"],["1.18","Temporary Works"]]
+      .map(([sor,item,single])=>single?{id:"P"+sor,sor,item,pm:true,single:true,pct:"",comments:""}:{id:"P"+sor,sor,item,pm:true,mat:"",lab:"",comments:""})}],
+    issues:"",look:{planned:"",deliveries:"",tests:""}},
+  MYD:{"mode": "pct", "meta": {"project": "MYD/Variations", "contractor": "AirconMech – Mechanical Install", "scope": "MYD/Variations", "period": "", "reportDate": "", "preparedBy": "Mohammad Saqib"}, "sections": [{"sor": "1", "name": "Variations", "lines": [{"id": "V1.1", "sor": "1.1", "item": "FSA - Mounting Fan Coil Units", "pm": true, "comments": "", "single": true, "pct": ""}, {"id": "V1.2", "sor": "1.2", "item": "CT Welding - Cost breakdown below for welders, pipe fitters and GO on site from 06/08 as requested by Mercury. Mercury supplied weld equipment arrived on site to allow weld testing commence from 24/08.", "pm": true, "comments": "", "single": true, "pct": ""}, {"id": "V1.3", "sor": "1.3", "item": "Supply of additional stainless steel pipework", "pm": true, "comments": "", "single": true, "pct": ""}, {"id": "V1.4", "sor": "1.4", "item": "Cost breakdown below for welders, pipe fitters and GO on site from 06/08 as requested by Mercury. Mercury supplied weld equipment arrived on site to allow weld testing commence from 24/08.\nArgon gas not delivered to site until late afternoon 28/08.\nRAMS as issued 10/08 still not approved to allow access to site.", "pm": true, "comments": "", "single": true, "pct": ""}, {"id": "V1.5", "sor": "1.5", "item": "Cost breakdown below for welders, pipe fitters and GO on site from 06/08 as requested by Mercury. Mercury supplied weld equipment arrived on site to allow weld testing commence from 24/08.\nArgon gas not delivered to site until late afternoon 28/08.\nRAMS as issued 10/08 still not approved to allow access to site.\nWeld inspection on test weld required by PM before welding commences.\nStainless steel pipe due on site from Mercury next week from 07/09 to allow PM weld test.\nMercury supplied flange delivery from Petrochem delayed to Airconmech workshop for fabrication. Delivery date to be confirmed.", "pm": true, "comments": "", "single": true, "pct": ""}]}, {"sor": "2", "name": "CT Spools", "lines": [{"id": "V2.1", "sor": "2.1", "item": "ACM collect free issue flanges and pipework from Petrochem Dunboyne branch and delivery to workshop (3no. Deliveries)", "pm": true, "comments": "", "mat": "", "lab": ""}, {"id": "V2.2", "sor": "2.2", "item": "ACM to prefabricate the following flanged spool pieces at an overall length of 275mm & transport to site to Belgium (Allowance for 3 Number deliveries to Belgium only)", "pm": true, "comments": "", "mat": "", "lab": ""}]}, {"sor": "3", "name": "CT Spools – Pre-Fabrication Works off Site (all welds to be purged using argon gas)", "lines": [{"id": "V3.1", "sor": "3.1", "item": "S/S Flange (72 No.) EN1092 316L 10\" PN10/11B RFWN SCH40S, to suit 273mm OD x 9.27mm Wall", "pm": true, "comments": "", "mat": "", "lab": ""}, {"id": "V3.2", "sor": "3.2", "item": "S/S Flange (24 No.) EN1092 316L 12\" PN10/11B RFWN SCH40S, to suit 323.9mm OD x 9.53mm Wall", "pm": true, "comments": "", "mat": "", "lab": ""}, {"id": "V3.3", "sor": "3.3", "item": "S/S Flange (24 No.) EN1092 316L 18\" PN10/11B RFWN SCH40S, to suit 457mm OD x 9.53mm Wall", "pm": true, "comments": "", "mat": "", "lab": ""}, {"id": "V3.4", "sor": "3.4", "item": "S/S Flange (48N0.) EN1092 316L 4\" PN10/11B RFWN SCH40S\nEach spool requires 2no. Welds\nBarrell nipple thread cut off on one end and pipe extension welded between flange and nipple.", "pm": true, "comments": "", "mat": "", "lab": ""}]}, {"sor": "4", "name": "CT Spools – On Site Working in Belgium / Field Welding Spools to Cooling Tower Pipe Connections", "lines": [{"id": "V4.1", "sor": "4.1", "item": "S/S Flange (72 No.) EN1092 316L 10\" PN10/11B RFWN SCH40S, spool piece 275mm long\n8 hrs per weld (1no. Welder, 1no. Pipe fitter 8 hrs & GO 2 hrs)\nTravel, subsistence & accommodation included", "pm": true, "comments": "", "mat": "", "lab": ""}, {"id": "V4.2", "sor": "4.2", "item": "S/S Flange (24 No.) EN1092 316L 12\" PN10/11B RFWN SCH40S, spool piece 275mm long\n8 hrs per weld (1no. Welder, 1no. Pipe fitter 8 hrs & GO 2 hrs)\nTravel, subsistence & accommodation included", "pm": true, "comments": "", "mat": "", "lab": ""}, {"id": "V4.3", "sor": "4.3", "item": "S/S Flange (24 No.) EN1092 316L 18\" PN10/11B RFWN SCH40S, spool piece 275mm long\n12 hrs per weld (1no. Welder, 1no. Pipe fitter 12 hrs & GO 2 hrs)\nTravel, subsistence & accommodation included", "pm": true, "comments": "", "mat": "", "lab": ""}, {"id": "V4.4", "sor": "4.4", "item": "S/S Flange (48 No.) EN1092 316L 4\" PN10/11B RFWN SCH40S.\nThreaded end of barrell nipple screwed onto female thread on CT spigot connection", "pm": true, "comments": "", "mat": "", "lab": ""}, {"id": "V4.5", "sor": "4.5", "item": "S/S Flange (48 No.) Raised face weld neck flange 6\" Sch40 PN16 NB 316L PN10/16\nThreaded flange screwed onto female thread on CT spigot connection", "pm": true, "comments": "", "mat": "", "lab": ""}]}, {"sor": "5", "name": "CT Spools – Preliminaries", "lines": [{"id": "V5.1", "sor": "5.1", "item": "Consumables - welding rods, Tungstons, flap discs, cutting discs", "pm": true, "comments": "", "mat": "", "lab": ""}, {"id": "V5.2", "sor": "5.2", "item": "Site Project Management & Supervision", "pm": true, "comments": "", "mat": "", "lab": ""}, {"id": "V5.3", "sor": "5.3", "item": "Health & Safety", "pm": true, "comments": "", "mat": "", "lab": ""}, {"id": "V5.4", "sor": "5.4", "item": "Site Inductions & Mobilisation", "pm": true, "comments": "", "mat": "", "lab": ""}]}, {"sor": "6", "name": "S25 Flange Welding", "lines": [{"id": "V6.1", "sor": "6.1", "item": "Cooling tower to S25 pipework - Weld a 16\" WN flange onto carbon steel pipe sch 20 on external side of wall, including clean and bevel pipe and clean flange", "pm": true, "comments": "", "mat": "", "lab": ""}, {"id": "V6.2", "sor": "6.2", "item": "12 hrs per weld (1no. Welder, 1no. Pipe fitter) & (1no. GO at 4 hrs per weld) Travel, subsistence & accommodation included", "pm": true, "comments": "", "mat": "", "lab": ""}, {"id": "V6.3", "sor": "6.3", "item": "NDT 10% of fields welds (3no. Total) out of normal working hours plus supervision", "pm": true, "comments": "", "mat": "", "lab": ""}, {"id": "V6.4", "sor": "6.4", "item": "Consumables - 16\" flange clamp", "pm": true, "comments": "", "mat": "", "lab": ""}, {"id": "V6.5", "sor": "6.5", "item": "Supervision (2.5hrs per day)", "pm": true, "comments": "", "mat": "", "lab": ""}, {"id": "V6.6", "sor": "6.6", "item": "Health & Safety (2.5hrs per day)", "pm": true, "comments": "", "mat": "", "lab": ""}, {"id": "V6.7", "sor": "6.7", "item": "Project Manager (1.5hrs per day)", "pm": true, "comments": "", "mat": "", "lab": ""}, {"id": "V6.8", "sor": "6.8", "item": "Site Inductions & Mobilisation for Tradesmen", "pm": true, "comments": "", "mat": "", "lab": ""}]}], "issues": "", "look": {"planned": "", "deliveries": "", "tests": ""}}
 };
 const PMETA=[["project","Project"],["contractor","Contractor"],["scope","Scope basis"],["period","Reporting period"],["reportDate","Report date"],["preparedBy","Prepared by"]];
 const PLOOK=[["planned","Planned activity / rows"],["deliveries","Material deliveries due"],["tests","Tests and inspections planned"]];
 const clone=o=>JSON.parse(JSON.stringify(o));
 function getProg(pkg){return progress[pkg]||(PROG_TEMPLATE[pkg]?clone(PROG_TEMPLATE[pkg]):null)}
 const num=v=>{if(v===""||v==null)return null;const n=Number(String(v).replace(/,/g,"").trim());return isFinite(n)?n:null};
-function linePct(l){const qy=num(l.qty);if(qy==null||qy<=0)return null;const d=num(l.done);return d==null?0:Math.min(Math.max(d,0)/qy,1)}
-function avgPct(lines){const v=lines.map(linePct).filter(x=>x!=null);return {avg:v.length?v.reduce((a,b)=>a+b,0)/v.length:0,n:v.length}}
+function qtyPct(l){const qy=num(l.qty);if(qy==null||qy<=0)return null;const d=num(l.done);return d==null?0:Math.min(Math.max(d,0)/qy,1)}
+const pv=v=>{const n=num(v);return n==null?0:Math.min(Math.max(n,0),100)/100};
+function lineVals(l){if(l.pm)return l.single?[pv(l.pct)]:[pv(l.mat),pv(l.lab)];const q=qtyPct(l);return q==null?[]:[q]}
+function linePct(l){if(!l.pm)return qtyPct(l);const v=lineVals(l);return v.reduce((a,b)=>a+b,0)/v.length}
+function avgPct(lines){const v=lines.flatMap(lineVals);return {avg:v.length?v.reduce((a,b)=>a+b,0)/v.length:0,n:v.length}}
+const isPm=P=>P&&P.mode==="pct";
+const pkgLabel=id=>{const p=PKGS.find(x=>x.id===id);return p&&p.label||id};
+const overSub=(P,n)=>isPm(P)?`Average of ${n} material and labour item${n===1?"":"s"}`:`Average of ${n} quantified line item${n===1?"":"s"}`;
+const overLabel=P=>isPm(P)?"Overall progress (average of material and labour items)":"Overall progress (average of quantified line items)";
+const fmtP=v=>{const n=num(v);return (n==null?0:Math.round(Math.min(Math.max(n,0),100)*10)/10)+"%"};
 function allLines(P){return P.sections.reduce((a,s)=>a.concat(s.lines),[])}
 const pct0=x=>Math.round(x*100)+"%";
 const pct1=x=>{const v=x*100;return (v>0&&v<10?v.toFixed(1):Math.round(v))+"%"};
@@ -360,6 +440,14 @@ const GRID={
     {k:"closedOn",l:"Date closed",t:"date",w:136},
     {k:"_od",l:"Overdue",t:"ro",w:96,calc:odHtml},
     {k:"notes",l:"Update / comments",t:"long",w:280}],
+  event:[REF,PKG,
+    {k:"date",l:"Date",t:"date",w:136},
+    {k:"type",l:"Type",t:"select",w:176},
+    {k:"title",l:"Event",t:"long",w:300},
+    {k:"impact",l:"Impact",t:"select",w:156,vcol:1},
+    {k:"related",l:"Related ref",t:"text",w:130},
+    {k:"who",l:"Who",t:"text",w:140},
+    {k:"notes",l:"Details / outcome",t:"long",w:320}],
   todo:[REF,PKG,
     {k:"title",l:"Task",t:"long",w:300},
     {k:"owner",l:"Who",t:"text",w:130},
@@ -409,13 +497,13 @@ function readLogo(file){return new Promise((res,rej)=>{
     im.src=url};
   fr.readAsDataURL(file)})}
 function nextRef(kind,pkg,exceptId){
-  const pre=pkg+"-"+SCHEMA[kind].letter;let max=0;
+  const pre=(pkg==="ALL"?"PRJ":pkg)+"-"+SCHEMA[kind].letter;let max=0;
   items.forEach(i=>{if(i.id!==exceptId&&i.ref&&i.ref.indexOf(pre)===0){const n=parseInt(i.ref.slice(pre.length),10);if(n>max)max=n}});
   return pre+String(max+1).padStart(3,"0");
 }
 
 /* ---------- render: chrome ---------- */
-function all(kind,pkg){const out=[];items.forEach(i=>{if(i.kind===kind&&(!pkg||pkg==="ALL"||i.pkg===pkg))out.push(i)});return out}
+function all(kind,pkg){const out=[];items.forEach(i=>{if(i.kind===kind&&(!pkg||pkg==="ALL"||i.pkg===pkg||i.pkg==="ALL"))out.push(i)});return out}
 function renderLanes(){
   $("lanes").innerHTML=PKGS.map(p=>{
     const d=all("delay",p.id).filter(i=>!isClosed(i));
@@ -444,6 +532,8 @@ function renderTabs(){
     return `<button class="tab" role="tab" data-k="${k}" aria-selected="${view===k}">${SCHEMA[k].tab}<span class="n">${n}</span></button>`}).join("")
     +`<button class="tab" role="tab" data-k="progress" aria-selected="${view==="progress"}">Progress</button>`;
   $("tools").hidden=view==="progress";
+  $("tlseg").hidden=view!=="event";$("hcwrap").hidden=view==="event";
+  $("tlseg").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.tl===tlView()));
 }
 function renderName(){if(document.activeElement!==$("pname"))$("pname").textContent=projectName;document.title=projectName}
 function renderSync(){
@@ -452,11 +542,12 @@ function renderSync(){
   $("exportBtn").hidden=!downloads;$("xlsxBtn").hidden=!downloads||!window.XLSX;$("importBtn").hidden=readOnly||!window.XLSX;
 }
 function renderFilterline(){
-  if(view==="progress"){$("filterline").innerHTML=readOnly||!getProg(progPkg)?"":"Enter quantities in the Done to date column. % complete and overall progress update automatically.";return}
+  if(view==="progress"){const P=getProg(progPkg);$("filterline").innerHTML=readOnly||!P?"":isPm(P)?"Enter % complete for material and labour on each item. Type in the shaded row at the end of a section to add a line item.":"Enter quantities in the Done to date column. Type in the shaded row at the end of a section to add a line item.";return}
   const bits=[];
   if(pkgFilter!=="ALL")bits.push(`Showing ${pkgFilter} only. <button data-clear="pkg">Show all packages</button>`);
   if(q.trim())bits.push(`Matching "${esc(q.trim())}". <button data-clear="q">Clear search</button>`);
-  if(!readOnly)bits.push(`Click any cell to type; changes save as you go. Enter moves down, Shift+Enter starts a new line. Type in the last row to add ${aN(SCHEMA[view].noun)}.`);
+  if(view==="event"&&tlView()==="timeline")bits.push(all("event",pkgFilter).length?"Newest at the bottom. Click an event to edit it in the table.":"");
+  else if(!readOnly)bits.push(`Click any cell to type; changes save as you go. Enter moves down, Shift+Enter starts a new line. Type in the last row to add ${aN(SCHEMA[view].noun)}.`);
   $("filterline").innerHTML=bits.join(" ");
 }
 function renderChrome(){renderLanes();renderTabs();renderSync();renderName();renderLogo()}
@@ -467,7 +558,8 @@ function filtered(){
   const s=q.trim().toLowerCase();
   let list=all(view,pkgFilter);
   if(hideClosed)list=list.filter(i=>!isClosed(i));
-  if(s)list=list.filter(i=>[i.ref,i.title,i.owner,i.responsible,i.notes,i.mitigation,i.comments,i.cause,i.source].some(v=>v&&String(v).toLowerCase().includes(s)));
+  if(s)list=list.filter(i=>[i.ref,i.title,i.owner,i.responsible,i.notes,i.mitigation,i.comments,i.cause,i.source,i.type,i.related,i.who].some(v=>v&&String(v).toLowerCase().includes(s)));
+  if(view==="event")return list.sort((a,b)=>(a.date||"9999").localeCompare(b.date||"9999")||(a.createdAt||0)-(b.createdAt||0));
   return list.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)||String(a.ref).localeCompare(String(b.ref)));
 }
 function grow(el){el.style.height="auto";el.style.height=Math.max(36,el.scrollHeight)+"px"}
@@ -479,7 +571,7 @@ function rowHtml(i){
     const v=isNew?(c.t==="pkg"?newPkg:""):(i[c.k]==null?"":String(i[c.k]));
     const a=`class="cell" data-k="${c.k}" aria-label="${esc(c.l)}"${dis}`;
     let inner,cls="",dv="";
-    if(c.t==="pkg"){cls="pk "+v;inner=`<select ${a}>${PKGS.map(p=>`<option${p.id===v?" selected":""}>${p.id}</option>`).join("")}</select>`}
+    if(c.t==="pkg"){cls="pk "+v;inner=`<select ${a}>${(view==="event"?PKGS.concat([{id:"ALL"}]):PKGS).map(p=>`<option value="${p.id}"${p.id===v?" selected":""}>${p.id==="ALL"?"All":p.id}</option>`).join("")}</select>`}
     else if(c.t==="select"){
       inner=`<select ${a}>${c.k==="status"&&!isNew?"":'<option value=""></option>'}${opt(view,c.k).map(x=>`<option${x===v?" selected":""}>${esc(x)}</option>`).join("")}</select>`;
       if(c.vcol)dv=` data-v="${esc(v)}"`;
@@ -529,30 +621,42 @@ function patchRow(tr,i){
   rowSig.set(i.id,sig(i));
 }
 function progHtml(pkg,P){
-  const pills=`<div class="ptop"><div class="pkpills" role="group" aria-label="Package">${PKGS.map(p=>`<button class="pp ${p.id}" data-pp="${p.id}" aria-pressed="${p.id===pkg}">${p.id}</button>`).join("")}</div>${
+  const pills=`<div class="ptop"><div class="pkpills" role="group" aria-label="Package">${PKGS.map(p=>`<button class="pp ${p.id}" data-pp="${p.id}" aria-pressed="${p.id===pkg}">${esc(p.label||p.id)}</button>`).join("")}</div>${
     P&&downloads&&window.jspdf?'<button class="btn primary" id="pdfBtn">Download PDF report</button>':""}</div>`;
-  if(!P)return pills+`<div class="pempty"><p class="big">${pkg} progress tracker</p><p>Progress tracking for ${pkg} will be added later.</p></div>`;
+  if(!P)return pills+`<div class="pempty"><p class="big">${esc(pkgLabel(pkg))} progress tracker</p><p>Progress tracking for ${esc(pkgLabel(pkg))} will be added later.</p></div>`;
   const dis=readOnly?" disabled":"";
   const meta=`<section class="pmeta" data-id="meta">${PMETA.map(([k,l])=>`<label class="mf"><span>${l}</span>${k==="reportDate"
       ?`<input type="date" class="cell" data-k="${k}" value="${esc(iso(P.meta[k])||P.meta[k]||"")}"${dis}>`
       :`<textarea rows="1" class="cell" data-k="${k}"${dis}>${esc(P.meta[k]||"")}</textarea>`}</label>`).join("")}</section>`;
-  const o=avgPct(allLines(P));
+  const o=avgPct(allLines(P)), pm=isPm(P);
   const ov=`<div class="overall"><div><div class="olabel">Overall progress</div><div class="onum" id="pOverall">${pct1(o.avg)}</div>
-    <div class="osub" id="pOverSub">Average of ${o.n} quantified line item${o.n===1?"":"s"}</div></div><div class="obar"><i id="pOverBar" style="width:${(o.avg*100).toFixed(2)}%"></i></div></div>`;
-  const cols=[["SOR",84],["Line item",300],["Unit",76],["Scope qty",96],["Done to date",116],["% complete",170],["Comments",300]];
-  const w=cols.reduce((s,c)=>s+c[1],0);
+    <div class="osub" id="pOverSub">${overSub(P,o.n)}</div></div><div class="obar"><i id="pOverBar" style="width:${(o.avg*100).toFixed(2)}%"></i></div></div>`;
+  const cols=pm?[["Ref",70],["Item",320],["Material",120],["Labour",120],["% complete",180],["Comments",300],["",78]]
+    :[["SOR",84],["Line item",300],["Unit",76],["Scope qty",96],["Done to date",116],["% complete",170],["Comments",280],["",78]];
+  const w=cols.reduce((s,c)=>s+c[1],0), nc=cols.length, lead=pm?4:5;
+  const pin=(l,k,lab)=>`<div class="pin"><input type="text" inputmode="decimal" class="cell num" data-k="${k}" aria-label="${lab} % for ${esc(l.item)}" placeholder="0" value="${esc(l[k]||"")}"${dis}><span>%</span></div>`;
+  const refCell=l=>`<td><input type="text" class="cell ref" data-k="sor" aria-label="${pm?"Ref":"SOR"}" value="${esc(l.sor)}"${dis}></td>`;
+  const acts=l=>readOnly?"<td></td>":`<td class="acts">${l.pm?`<button class="ra" data-act="split" title="${l.single?"Split into material and labour":"Use a single % for this item"}">${l.single?"Split":"Merge"}</button>`:""}<button class="ra del" data-act="del" title="Delete line item" aria-label="Delete ${esc(l.sor||l.item)}">×</button></td>`;
   const rows=P.sections.map((sec,si)=>{const sp=avgPct(sec.lines);
-    return `<tr class="sec" data-sec="${si}"><td colspan="5">${esc(sec.name)}</td><td class="secp">${sp.n?pct0(sp.avg):""}</td><td></td></tr>`+
-      sec.lines.map(l=>{const pc=linePct(l), over=num(l.done)!=null&&num(l.qty)!=null&&num(l.done)>num(l.qty);
-        return `<tr data-id="${esc(l.id)}" class="${pc===1?"full":""}${over?" over":""}"><td class="ro">${esc(l.sor)}</td>
+    const head=`<tr class="sec" data-id="S${si}" data-sec="${si}"><td colspan="${lead}"><div class="secin">${sec.sor?`<span class="secno">${esc(sec.sor)}</span>`:""}<input type="text" class="cell" data-k="secname" aria-label="Section name" value="${esc(sec.name)}"${dis}></div></td><td class="secp">${sp.n?pct0(sp.avg):""}</td><td></td><td class="acts">${readOnly?"":`<button class="ra del" data-act="delsec" title="Delete section" aria-label="Delete section ${esc(sec.name)}">×</button>`}</td></tr>`;
+    const body=sec.lines.map(l=>{const pc=linePct(l);
+        if(l.pm)return `<tr data-id="${esc(l.id)}" class="${pc===1?"full":""}">${refCell(l)}
+          <td><textarea rows="1" class="cell" data-k="item" aria-label="Item"${dis}>${esc(l.item)}</textarea></td>
+          ${l.single?`<td class="done" colspan="2">${pin(l,"pct","Progress")}</td>`:`<td class="done">${pin(l,"mat","Material")}</td><td class="done">${pin(l,"lab","Labour")}</td>`}
+          <td class="pc">${pcHtml(pc)}</td>
+          <td><textarea rows="1" class="cell" data-k="comments" aria-label="Comments"${dis}>${esc(l.comments)}</textarea></td>${acts(l)}</tr>`;
+        const over=num(l.done)!=null&&num(l.qty)!=null&&num(l.done)>num(l.qty);
+        return `<tr data-id="${esc(l.id)}" class="${pc===1?"full":""}${over?" over":""}">${refCell(l)}
         <td><textarea rows="1" class="cell" data-k="item" aria-label="Line item"${dis}>${esc(l.item)}</textarea></td>
         <td><input type="text" class="cell" data-k="unit" aria-label="Unit" value="${esc(l.unit)}"${dis}></td>
         <td><input type="text" inputmode="decimal" class="cell num" data-k="qty" aria-label="Scope qty" value="${esc(l.qty)}"${dis}></td>
         <td class="done"><input type="text" inputmode="decimal" class="cell num" data-k="done" aria-label="Done to date for ${esc(l.item)}" value="${esc(l.done)}"${dis}></td>
         <td class="pc">${pcHtml(pc)}</td>
-        <td><textarea rows="1" class="cell" data-k="comments" aria-label="Comments"${dis}>${esc(l.comments)}</textarea></td></tr>`}).join("")}).join("");
+        <td><textarea rows="1" class="cell" data-k="comments" aria-label="Comments"${dis}>${esc(l.comments)}</textarea></td>${acts(l)}</tr>`}).join("");
+    const add=readOnly?"":`<tr class="addrow" data-id="A${si}" data-sec="${si}"><td class="ro">+</td><td colspan="${nc-1}"><input type="text" class="cell" data-k="newitem" aria-label="Add a line item to ${esc(sec.name)}" placeholder="Add a line item to ${esc(sec.name)}"></td></tr>`;
+    return head+body+add}).join("")+(readOnly?"":`<tr class="addsec" data-id="NS"><td colspan="${nc}"><input type="text" class="cell" data-k="newsec" aria-label="Add a new section" placeholder="+ Add a new section"></td></tr>`);
   const table=`<div class="tablebox"><table class="grid" style="width:100%;min-width:${w}px"><colgroup>${cols.map(c=>`<col style="width:${c[1]}px">`).join("")}</colgroup>
-    <thead><tr>${cols.map(c=>`<th scope="col">${c[0]}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>`;
+    <thead><tr>${cols.map(c=>`<th scope="col"${c[0]?"":' aria-label="Row actions"'}>${c[0]}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>`;
   const notes=`<section class="pnotes" data-id="notes"><h3>Issues, risks and scope clarifications</h3>
     <textarea class="cell box" data-k="issues" aria-label="Issues, risks and scope clarifications"${dis}>${esc(P.issues||"")}</textarea>
     <h3>Look-ahead, next period</h3><div class="look">${PLOOK.map(([k,l])=>`<label><span>${l}</span><textarea class="cell box" data-k="${k}"${dis}>${esc((P.look||{})[k]||"")}</textarea></label>`).join("")}</div></section>`;
@@ -579,7 +683,7 @@ function patchProg(P){
   });
   const o=avgPct(allLines(P));
   $("pOverall").textContent=pct1(o.avg);$("pOverBar").style.width=(o.avg*100).toFixed(2)+"%";
-  $("pOverSub").textContent=`Average of ${o.n} quantified line item${o.n===1?"":"s"}`;
+  $("pOverSub").textContent=overSub(P,o.n);
   progRendered.sig=progKey(P);
 }
 function progCommit(el){
@@ -589,9 +693,16 @@ function progCommit(el){
   const P=getProg(progPkg);if(!P)return;
   let cur;
   if(id==="meta"){cur=P.meta[k]||"";if(cur===val)return;P.meta[k]=val}
+  else if(/^S\d+$/.test(id)){const sec=P.sections[+id.slice(1)];if(!sec)return;cur=sec.name||"";if(cur===val)return;if(!val){el.value=cur;return}sec.name=val}
   else if(id==="notes"){P.look=P.look||{};cur=k==="issues"?(P.issues||""):(P.look[k]||"");if(cur===val)return;if(k==="issues")P.issues=val;else P.look[k]=val}
   else{
     const line=allLines(P).find(l=>l.id===id);if(!line)return;cur=line[k]==null?"":String(line[k]);if(cur===val)return;
+    if(k==="mat"||k==="lab"||k==="pct"){
+      const v=val.replace(/%\s*$/,"").trim(), n=num(v);
+      if(v!==""&&(n==null||n<0||n>100)){el.value=cur;toast("Enter a percentage from 0 to 100.");return}
+      if(v!==val)el.value=v;
+      if(cur===v)return;line[k]=v;progress[progPkg]=P;patchProg(P);renderLanes();saveProg(progPkg);return;
+    }
     if((k==="done"||k==="qty")&&val!==""&&(num(val)==null||num(val)<0)&&!(k==="qty"&&/^tbc$/i.test(val))){
       el.value=cur;toast(k==="done"?"Enter a number for done to date.":"Enter a number or TBC for scope qty.");return}
     line[k]=val;
@@ -600,14 +711,52 @@ function progCommit(el){
   patchProg(P);renderLanes();saveProg(progPkg);
 }
 function syncTable(){
-  if(view==="progress"){$("tablebox").hidden=true;$("progbox").hidden=false;syncProg();return}
+  if(view==="progress"){$("tablebox").hidden=true;$("tlbox").hidden=true;$("progbox").hidden=false;syncProg();return}
+  $("progbox").hidden=true;
+  if(view==="event"&&tlView()==="timeline"){$("tablebox").hidden=true;$("tlbox").hidden=false;renderTimeline();return}
+  $("tlbox").hidden=true;
   $("tablebox").hidden=false;$("progbox").hidden=true;progRendered.sig=null;
   const list=filtered(), key=[view,pkgFilter,q,hideClosed,readOnly].join("|");
   const tb=$("tablebox").querySelector("tbody");
   const dom=tb?[...tb.children].map(t=>t.dataset.id).filter(x=>x!=="new").join(","):null;
-  if(!tb||key!==tableKey||dom!==list.map(i=>i.id).join(",")){tableKey=key;fullTable(list);return}
+  const ids=list.map(i=>i.id), same=view==="event"&&dom!=null?dom.split(",").filter(Boolean).sort().join(",")===ids.slice().sort().join(","):dom===ids.join(",");
+  if(!tb||key!==tableKey||!same){tableKey=key;fullTable(list);return}
   list.forEach(i=>{if(rowSig.get(i.id)!==sig(i)){const tr=tb.querySelector(`tr[data-id="${i.id}"]`);if(tr)patchRow(tr,i)}});
 }
+
+/* ---------- timeline view ---------- */
+let tlMode=null, tlManual=false;
+function tlView(){return tlMode||"table"}
+function enterView(k){view=k;if(k==="event"&&!tlManual)tlMode=all("event").length?"timeline":"table"}
+function renderTimeline(){
+  const list=filtered(), box=$("tlbox");
+  if(!list.length){
+    box.innerHTML=`<div class="tlempty"><p>${all("event",pkgFilter).length?"No events match these filters.":"No events recorded yet. Log site events, meetings, instructions, deliveries and milestones as they happen."}</p>${readOnly?"":'<button class="btn primary" data-tlgo="table">Add an event</button>'}</div>`;
+    return;
+  }
+  const groups=[];let cur=null;
+  list.forEach(i=>{const key=i.date?i.date.slice(0,7):"none";if(!cur||cur.key!==key){cur={key,items:[]};groups.push(cur)}cur.items.push(i)});
+  const monthName=k=>k==="none"?"No date":new Date(k+"-01T00:00:00").toLocaleDateString("en-GB",{month:"long",year:"numeric"});
+  box.innerHTML=`<div class="tl">${groups.map(g=>`<h3 class="tlm">${monthName(g.key)}</h3><ol class="tll">${g.items.map(i=>{
+    const d=i.date?new Date(i.date+"T00:00:00"):null;
+    const imp=i.impact&&i.impact!=="None"?`<span class="imp${i.impact==="Programme and cost"?" both":""}">Impact: ${esc(i.impact.toLowerCase())}</span>`:"";
+    return `<li class="tli ${esc(i.pkg)}" data-open="${i.id}" tabindex="0" aria-label="${esc((i.date?fmt(i.date)+", ":"")+(i.title||"Event"))}">
+      <div class="tld"><b>${d?String(d.getDate()).padStart(2,"0"):"–"}</b><span>${d?d.toLocaleDateString("en-GB",{weekday:"short"}):""}</span></div>
+      <div class="tlc"><div class="tlh"><span class="tlpk">${i.pkg==="ALL"?"All packages":esc(i.pkg)}</span>${i.type?`<span class="tltype">${esc(i.type)}</span>`:""}${imp}</div>
+        <div class="tltitle">${esc(i.title||"Untitled event")}</div>${i.notes?`<p>${esc(i.notes)}</p>`:""}
+        <div class="tlmeta"><span>${esc(i.ref)}</span>${i.related?`<span>Related: ${esc(i.related)}</span>`:""}${i.who?`<span>${esc(i.who)}</span>`:""}</div></div></li>`}).join("")}</ol>`).join("")}</div>`;
+}
+function openEventInTable(id){
+  tlMode="table";render();
+  const tr=$("tablebox").querySelector(`tr[data-id="${id}"]`);if(!tr)return;
+  tr.scrollIntoView({block:"center"});const el=tr.querySelector('.cell[data-k="title"]');if(el)el.focus({preventScroll:true});
+}
+$("tlseg").addEventListener("click",e=>{const b=e.target.closest("[data-tl]");if(!b)return;tlMode=b.dataset.tl;tlManual=true;render()});
+$("tlbox").addEventListener("click",e=>{
+  if(e.target.closest("[data-tlgo]")){tlMode="table";render();const t=$("tablebox").querySelector('tr.newrow .cell[data-k="title"]');if(t)t.focus();return}
+  const li=e.target.closest("[data-open]");if(li)openEventInTable(li.dataset.open);
+});
+$("tlbox").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){const li=e.target.closest("[data-open]");if(li){e.preventDefault();openEventInTable(li.dataset.open)}}});
 
 /* ---------- editing ---------- */
 function commit(el){
@@ -621,6 +770,7 @@ function commit(el){
     const it={id:newId(),kind:view,createdAt:Date.now(),pkg:newPkg,status:opt(view,"status")[0]};
     if(view==="delay"){it.identified=today();it.eot="To be assessed"}
     if(view==="action")it.raised=today();
+    if(view==="event"&&k!=="date")it.date=today();
     it[k]=val;it.ref=nextRef(view,it.pkg,it.id);
     tr.dataset.id=it.id;tr.classList.remove("newrow");
     const t=tr.querySelector('.cell[data-k="title"]');if(t)t.removeAttribute("placeholder");
@@ -683,15 +833,20 @@ async function buildProgressPdf(pkg,P){
   const logo=await logoForPdf();
   const base=P.meta.project?P.meta.project.split(" – ")[0]:pkg;
   const title=base+" – Mechanical Progress Report";
-  const COLS=[["SOR",17,"l"],["Line item",62,"l"],["Unit",13,"l"],["Scope qty",17,"r"],["Done to date",19,"r"],["% complete",28,"pc"],["Comments",34,"l"]];
+  const pm=isPm(P);
+  const COLS=pm?[["Ref",11,"l"],["Item",97,"l"],["Material",16,"r"],["Labour",16,"r"],["% complete",24,"pc"],["Comments",26,"l"]]
+    :[["SOR",17,"l"],["Line item",62,"l"],["Unit",13,"l"],["Scope qty",17,"r"],["Done to date",19,"r"],["% complete",28,"pc"],["Comments",34,"l"]];
+  const pcI=COLS.findIndex(c=>c[2]==="pc"), pcW=COLS[pcI][1], comW=COLS[COLS.length-1][1];
   const o=avgPct(allLines(P));
   const clean=t=>String(t==null?"":t).replace(/\r/g,"");
-  function run(s,draw){
-    const fs=8.2*s, lh=fs*0.3528*1.22, pad=1.35*s, row1=lh+2*pad;
+  let LHF=1.22;
+  function run(s,draw,padK){
+    padK=padK||1.35;
+    const fs=8.2*s, lh=fs*0.3528*LHF, pad=padK*s, padX=Math.max(pad,1.3*s), row1=lh+2*pad;
     const F=(size,bold,c)=>{doc.setFont("helvetica",bold?"bold":"normal");doc.setFontSize(size);doc.setTextColor(...c)};
     const box=(x,y,w,h,fillC,stroke)=>{if(!draw)return;if(fillC){doc.setFillColor(...fillC);doc.rect(x,y,w,h,"F")}
       if(stroke){doc.setDrawColor(...LINE);doc.setLineWidth(0.15);doc.rect(x,y,w,h,"S")}};
-    const txt=(t,x,y,opt)=>{if(draw)doc.text(t,x,y,Object.assign({baseline:"top",lineHeightFactor:1.22},opt||{}))};
+    const txt=(t,x,y,opt)=>{if(draw)doc.text(t,x,y,Object.assign({baseline:"top",lineHeightFactor:LHF},opt||{}))};
     const wrap=(t,w,size,bold)=>{F(size,bold,INK);return doc.splitTextToSize(clean(t),Math.max(w,4))};
     let y=M;
     // brand header
@@ -708,72 +863,80 @@ async function buildProgressPdf(pkg,P){
     const half=CW/2, lw=27*s;
     const L=[["project","Project"],["contractor","Contractor"],["scope","Scope basis"]], R=[["period","Reporting period"],["reportDate","Report date"],["preparedBy","Prepared by"]];
     for(let i=0;i<3;i++){
-      const lv=wrap(P.meta[L[i][0]]||"",half-lw-2*pad,fs,false), rv=wrap(R[i][0]==="reportDate"?fmtDMY(P.meta.reportDate):(P.meta[R[i][0]]||""),half-lw-2*pad,fs,false);
+      const lv=wrap(P.meta[L[i][0]]||"",half-lw-2*padX,fs,false), rv=wrap(R[i][0]==="reportDate"?fmtDMY(P.meta.reportDate):(P.meta[R[i][0]]||""),half-lw-2*padX,fs,false);
       const h=Math.max(lv.length,rv.length,1)*lh+2*pad;
       [[L[i][1],lv,M],[R[i][1],rv,M+half]].forEach(([lab,val,x])=>{
         box(x,y,lw,h,LAV,true);box(x+lw,y,half-lw,h,null,true);
-        F(fs,true,INK);txt(lab,x+pad,y+pad);F(fs,false,INK);txt(val,x+lw+pad,y+pad)});
+        F(fs,true,INK);txt(lab,x+padX,y+pad);F(fs,false,INK);txt(val,x+lw+padX,y+pad)});
       y+=h;
     }
     y+=3.5*s;
-    const bar=(label)=>{const h=row1+0.8*s;box(M,y,CW,h,PUR);F(fs*1.08,true,WHITE);txt(label,M+pad+0.6*s,y+pad+0.3*s);y+=h};
+    const bar=(label)=>{const h=row1+0.8*s;box(M,y,CW,h,PUR);F(fs*1.08,true,WHITE);txt(label,M+padX+0.6*s,y+pad+0.3*s);y+=h};
     // line items
     bar("Progress by line item");
     let x=M;const hh=row1;
     COLS.forEach(([lab,w,al])=>{box(x,y,w,hh,GOLD,true);F(fs,true,INK);
-      if(al==="r"||al==="pc")txt(lab,x+w-pad,y+pad,{align:"right"});else txt(lab,x+pad,y+pad);x+=w});
+      if(al==="r"||al==="pc")txt(lab,x+w-padX,y+pad,{align:"right"});else txt(lab,x+padX,y+pad);x+=w});
     y+=hh;
-    const pcX=COLS.slice(0,5).reduce((a,c)=>a+c[1],0);
+    const pcX=COLS.slice(0,pcI).reduce((a,c)=>a+c[1],0);
     P.sections.forEach(sec=>{
       const sp=avgPct(sec.lines);
-      box(M,y,CW,row1,LAV,true);F(fs,true,INK);txt(sec.name,M+pad,y+pad);
-      if(sp.n)txt(pct0(sp.avg),M+pcX+COLS[5][1]-pad,y+pad,{align:"right"});
+      box(M,y,CW,row1,LAV,true);F(fs,true,INK);txt((sec.sor?sec.sor+"   ":"")+sec.name,M+padX,y+pad);
+      if(sp.n)txt(pct0(sp.avg),M+pcX+pcW-padX,y+pad,{align:"right"});
       y+=row1;
       sec.lines.forEach(l=>{
-        const pc=linePct(l), item=wrap(l.item,COLS[1][1]-2*pad,fs,false), com=wrap(l.comments,COLS[6][1]-2*pad,fs*0.92,false);
+        const pc=linePct(l), item=wrap(l.item,COLS[1][1]-2*padX,fs,false), com=wrap(l.comments,comW-2*padX,fs*0.92,false);
         const h=Math.max(item.length*lh,com.length*lh*0.92,lh)+2*pad;
+        const cells=pm?(l.single?[[l.sor,COLS[0][1],"b"],[item,COLS[1][1],"l"],[fmtP(l.pct),COLS[2][1]+COLS[3][1],"r"]]
+                                :[[l.sor,COLS[0][1],"b"],[item,COLS[1][1],"l"],[fmtP(l.mat),COLS[2][1],"r"],[fmtP(l.lab),COLS[3][1],"r"]])
+          :[[l.sor,COLS[0][1],"b"],[item,COLS[1][1],"l"],[l.unit,COLS[2][1],"l"],[l.qty,COLS[3][1],"r"],[l.done,COLS[4][1],"r"]];
         let cx=M;
-        const vals=[l.sor,item,l.unit,l.qty,l.done];
-        COLS.forEach(([lab,w,al],ci)=>{
-          box(cx,y,w,h,null,true);
-          if(ci<5){F(fs,ci===0,INK);const v=vals[ci];if(al==="r")txt(String(v||""),cx+w-pad,y+pad,{align:"right"});else txt(v,cx+pad,y+pad)}
-          else if(ci===5){
-            if(pc==null){F(fs,false,MUT);txt("n/a",cx+w-pad,y+pad,{align:"right"})}
-            else{const bw=w-2*pad-10*s, by=y+pad+lh/2-0.9*s;
-              if(draw){doc.setFillColor(...TRACK);doc.rect(cx+pad,by,bw,1.8*s,"F");
-                doc.setFillColor(...(pc===1?GREEN:PUR));if(pc>0)doc.rect(cx+pad,by,Math.max(bw*pc,0.4),1.8*s,"F")}
-              F(fs,true,pc===1?GREEN:INK);txt(pct0(pc),cx+w-pad,y+pad,{align:"right"})}
-          } else {F(fs*0.92,false,INK);txt(com,cx+pad,y+pad)}
-          cx+=w;
-        });
+        cells.forEach(([v,w,al])=>{box(cx,y,w,h,null,true);F(fs,al==="b",INK);
+          if(al==="r")txt(String(v==null?"":v),cx+w-padX,y+pad,{align:"right"});else txt(v==null?"":v,cx+padX,y+pad);cx+=w});
+        box(cx,y,pcW,h,null,true);
+        if(pc==null){F(fs,false,MUT);txt("n/a",cx+pcW-padX,y+pad,{align:"right"})}
+        else{const bw=pcW-2*padX-10*s, by=y+pad+lh/2-0.9*s;
+          if(draw){doc.setFillColor(...TRACK);doc.rect(cx+padX,by,bw,1.8*s,"F");
+            doc.setFillColor(...(pc===1?GREEN:PUR));if(pc>0)doc.rect(cx+padX,by,Math.max(bw*pc,0.4),1.8*s,"F")}
+          F(fs,true,pc===1?GREEN:INK);txt(pct0(pc),cx+pcW-padX,y+pad,{align:"right"})}
+        cx+=pcW;
+        box(cx,y,comW,h,null,true);F(fs*0.92,false,INK);txt(com,cx+padX,y+pad);
         y+=h;
       });
     });
     const oh=row1+1*s;
-    box(M,y,CW,oh,GOLD,true);F(fs*1.05,true,INK);txt("Overall progress (average of quantified line items)",M+pad,y+pad+0.4*s);
-    txt(pct1(o.avg),M+pcX+COLS[5][1]-pad,y+pad+0.4*s,{align:"right"});
+    box(M,y,CW,oh,GOLD,true);F(fs*1.05,true,INK);txt(overLabel(P),M+padX,y+pad+0.4*s);
+    txt(pct1(o.avg),M+pcX+pcW-padX,y+pad+0.4*s,{align:"right"});
     y+=oh+3.5*s;
     // issues
     bar("Issues, risks & scope clarifications");
-    const iss=wrap(P.issues||"",CW-2*pad,fs,false), ih=Math.max(iss.length*lh+2*pad,16*s);
-    box(M,y,CW,ih,null,true);F(fs,false,INK);txt(P.issues?iss:"",M+pad,y+pad);
+    const iss=wrap(P.issues||"",CW-2*padX,fs,false), ih=Math.max(iss.length*lh+2*pad,16*s);
+    box(M,y,CW,ih,null,true);F(fs,false,INK);txt(P.issues?iss:"",M+padX,y+pad);
     y+=ih+3.5*s;
     // look-ahead
     bar("Look-ahead – next period");
     const lkw=52*s;
     PLOOK.forEach(([k,lab])=>{
-      const v=wrap((P.look||{})[k]||"",CW-lkw-2*pad,fs,false), h=Math.max(v.length,1)*lh+2*pad+1*s;
+      const v=wrap((P.look||{})[k]||"",CW-lkw-2*padX,fs,false), h=Math.max(v.length,1)*lh+2*pad+1*s;
       box(M,y,lkw,h,LAV,true);box(M+lkw,y,CW-lkw,h,null,true);
-      F(fs,true,INK);txt(lab+":",M+pad,y+pad);F(fs,false,INK);txt(v,M+lkw+pad,y+pad);y+=h});
+      F(fs,true,INK);txt(lab+":",M+padX,y+pad);F(fs,false,INK);txt(v,M+lkw+padX,y+pad);y+=h});
     // footer
     if(draw){F(7,false,MUT);
-      doc.text(`AirconMech  |  ${title}  |  ${P.meta.period||""}`,M,H-M,{baseline:"bottom"});
-      doc.text(`Prepared by ${P.meta.preparedBy||"—"}  |  Report date ${fmtDMY(P.meta.reportDate)}`,W-M,H-M,{align:"right",baseline:"bottom"})}
+      doc.text(["AirconMech",title,P.meta.period].filter(Boolean).join("  |  "),M,H-M,{baseline:"bottom"});
+      doc.text([P.meta.preparedBy&&"Prepared by "+P.meta.preparedBy,P.meta.reportDate&&"Report date "+fmtDMY(P.meta.reportDate)].filter(Boolean).join("  |  "),W-M,H-M,{align:"right",baseline:"bottom"})}
     return y-M;
   }
   let s=1, fits=true;
-  while(run(s,false)>AVAIL){s-=0.02;if(s<0.55){s=0.55;fits=false;break}}
-  run(s,true);
+  // tighten spacing first, then reduce text size, until the report fits on one page
+  let padK=1.35;
+  const tries=[[1.35,1.22],[1.1,1.18],[0.9,1.15],[0.75,1.12]];
+  let found=false;
+  for(s=1;s>=0.55&&!found;s=Math.round((s-0.02)*100)/100){
+    for(const [pk,lf] of tries){LHF=lf;if(run(s,false,pk)<=AVAIL){padK=pk;found=true;break}}
+    if(found)break;
+  }
+  if(!found){s=0.55;padK=0.75;LHF=1.12;fits=false}
+  run(s,true,padK);
   doc.setProperties({title,subject:"Mechanical progress report",author:P.meta.preparedBy||"AirconMech",creator:"AirconMech project tracker"});
   return {buf:doc.output("arraybuffer"),fits,base};
 }
@@ -790,11 +953,64 @@ async function exportPdf(){
   finally{setBtn(false)}
 }
 
+/* ---------- adding, removing and changing progress line items ---------- */
+function progStructChanged(P,focus){
+  progress[progPkg]=P;progRendered.sig=null;syncProg();renderLanes();saveProg(progPkg);
+  if(focus){const el=$("progbox").querySelector(`[data-id="${focus[0]}"] .cell[data-k="${focus[1]}"]`);
+    if(el){el.focus();const n=el.value.length;try{el.setSelectionRange(n,n)}catch(e){}}}
+}
+function progAddLine(si,text){
+  const P=getProg(progPkg), sec=P&&P.sections[si];if(!sec)return;
+  const pm=isPm(P), id="N"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  let sor="";
+  if(pm||sec.sor){const n=sec.lines.reduce((m,l)=>{const x=String(l.sor||"").match(/(\d+)$/);return x?Math.max(m,+x[1]):m},0)+1;sor=sec.sor?sec.sor+"."+n:String(n)}
+  let l;
+  if(pm){const single=sec.lines.length>0&&sec.lines.filter(x=>x.single).length*2>sec.lines.length;
+    l=single?{id,sor,item:text,pm:true,single:true,pct:"",comments:""}:{id,sor,item:text,pm:true,mat:"",lab:"",comments:""}}
+  else l={id,sor,item:text,unit:"",qty:"",done:"",comments:""};
+  sec.lines.push(l);
+  progStructChanged(P,[id,"item"]);
+}
+function progAddSection(text){
+  const P=getProg(progPkg);if(!P)return;
+  const pm=isPm(P);
+  const sor=pm?String(P.sections.reduce((m,x)=>Math.max(m,parseInt(x.sor,10)||0),0)+1):"";
+  P.sections.push({sor,name:text,lines:[]});
+  progStructChanged(P,["S"+(P.sections.length-1),"secname"]);
+}
+function progRowAction(btn){
+  const P=getProg(progPkg);if(!P)return;
+  const tr=btn.closest("tr"), act=btn.dataset.act;
+  if(act==="delsec"){
+    const si=+tr.dataset.sec, sec=P.sections[si];if(!sec)return;
+    if(!confirm(`Delete the section "${sec.name}"${sec.lines.length?` and its ${sec.lines.length} line item${sec.lines.length===1?"":"s"}`:""}? This cannot be undone.`))return;
+    P.sections.splice(si,1);progStructChanged(P);toast("Section deleted.");return;
+  }
+  let sec=null,li=-1;P.sections.forEach(x=>{const i=x.lines.findIndex(l=>l.id===tr.dataset.id);if(i>=0){sec=x;li=i}});
+  if(!sec)return;const l=sec.lines[li];
+  if(act==="del"){
+    if(!confirm(`Delete ${l.sor?l.sor+" ":""}${String(l.item||"this line item").slice(0,70)}? Its progress will be removed from the report.`))return;
+    sec.lines.splice(li,1);progStructChanged(P);toast("Line item deleted.");return;
+  }
+  if(act==="split"){
+    if(l.single){l.mat=l.pct||"";l.lab=l.pct||"";delete l.pct;delete l.single}
+    else{const a=num(l.mat),b=num(l.lab);l.pct=a==null&&b==null?"":String(Math.round(((a||0)+(b||0))/2*10)/10);delete l.mat;delete l.lab;l.single=true}
+    progStructChanged(P,[l.id,l.single?"pct":"mat"]);
+  }
+}
+
 /* ---------- progress events ---------- */
 const pbox=$("progbox");
-pbox.addEventListener("click",e=>{if(e.target.closest("#pdfBtn"))return exportPdf();const b=e.target.closest("[data-pp]");if(b){progPkg=b.dataset.pp;render()}});
+pbox.addEventListener("click",e=>{if(e.target.closest("#pdfBtn"))return exportPdf();const ra=e.target.closest("[data-act]");if(ra&&!readOnly)return progRowAction(ra);const b=e.target.closest("[data-pp]");if(b){progPkg=b.dataset.pp;render()}});
 pbox.addEventListener("change",e=>{if(e.target.classList&&e.target.classList.contains("cell"))progCommit(e.target)});
-pbox.addEventListener("input",e=>{if(e.target.tagName==="TEXTAREA")grow(e.target)});
+pbox.addEventListener("input",e=>{
+  const el=e.target;if(el.tagName==="TEXTAREA")grow(el);
+  const k=el.dataset&&el.dataset.k;
+  if((k==="newitem"||k==="newsec")&&el.value&&!readOnly){
+    const v=el.value;el.value="";el.blur();
+    if(k==="newitem")progAddLine(+el.closest("tr").dataset.sec,v);else progAddSection(v);
+  }
+});
 pbox.addEventListener("keydown",e=>{
   const el=e.target;if(!el.classList||!el.classList.contains("cell"))return;
   const host=el.closest("[data-id]"),k=el.dataset.k;
@@ -814,9 +1030,12 @@ async function exportCsv(){
   if(view==="progress"){
     const P=getProg(progPkg);if(!P){toast(`There is no ${progPkg} progress to export yet.`);return}
     const cell=v=>{v=v==null?"":String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
-    const rows=[["Section","SOR","Line item","Unit","Scope qty","Done to date","% complete","Comments"].join(",")];
-    P.sections.forEach(sec=>sec.lines.forEach(l=>{const pc=linePct(l);rows.push([sec.name,l.sor,l.item,l.unit,l.qty,l.done,pc==null?"":pct0(pc),l.comments].map(cell).join(","))}));
-    rows.push(["Overall progress","","","","","",pct1(avgPct(allLines(P)).avg),""].map(cell).join(","));
+    const pm=isPm(P);
+    const rows=[(pm?["Section","Ref","Item","Material %","Labour %","% complete","Comments"]:["Section","SOR","Line item","Unit","Scope qty","Done to date","% complete","Comments"]).join(",")];
+    P.sections.forEach(sec=>sec.lines.forEach(l=>{const pc=linePct(l);
+      rows.push((pm?[sec.name,l.sor,l.item,l.single?fmtP(l.pct):fmtP(l.mat),l.single?"":fmtP(l.lab),pct0(pc),l.comments]
+        :[sec.name,l.sor,l.item,l.unit,l.qty,l.done,pc==null?"":pct0(pc),l.comments]).map(cell).join(","))}));
+    rows.push((pm?["Overall progress","","","","",pct1(avgPct(allLines(P)).avg),""]:["Overall progress","","","","","",pct1(avgPct(allLines(P)).avg),""]).map(cell).join(","));
     try{await downloads.save({filename:`${progPkg}-progress-${today()}.csv`,data:"\ufeff"+rows.join("\r\n")});toast("Exported.")}
     catch(e){if(e&&e.code&&e.code!=="declined"&&e.code!=="cancelled")toast("Export did not complete.")}
     return;
@@ -824,8 +1043,9 @@ async function exportCsv(){
   const cols=GRID[view].filter(c=>c.k!=="_od"), list=filtered();
   const cell=v=>{v=v==null?"":String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
   const val=(i,c)=>c.k==="_slip"?(slip(i)==null?"":slip(i)):i[c.k];
-  const head=cols.map(c=>c.l).concat(view==="delay"?[]:["Overdue"]);
-  const rows=[head.map(cell).join(",")].concat(list.map(i=>cols.map(c=>cell(val(i,c))).concat(view==="delay"?[]:[overdue(i)?"Overdue":""]).join(",")));
+  const noOd=view==="delay"||view==="event";
+  const head=cols.map(c=>c.l).concat(noOd?[]:["Overdue"]);
+  const rows=[head.map(cell).join(",")].concat(list.map(i=>cols.map(c=>cell(val(i,c))).concat(noOd?[]:[overdue(i)?"Overdue":""]).join(",")));
   const name=(projectName||"tracker").replace(/[^\w\- ]+/g,"").trim().replace(/\s+/g,"-")+"-"+SCHEMA[view].tab.toLowerCase().replace(/[^a-z]/g,"")+(pkgFilter==="ALL"?"":"-"+pkgFilter)+"-"+today()+".csv";
   try{await downloads.save({filename:name,data:"\ufeff"+rows.join("\r\n")});toast("Exported.")}
   catch(e){if(e&&e.code&&e.code!=="declined"&&e.code!=="cancelled")toast("Export did not complete.")}
@@ -835,9 +1055,10 @@ async function exportCsv(){
 const XL={
   delay:{sheet:"Delay Log",map:{"Ref":"ref","Package":"pkg","Delay description":"title","Cause":"cause","Impact":"impact","Date identified":"identified","Responsible party":"responsible","Planned date":"original","Forecast date":"revised","Status":"status","EOT claim":"eot","Mitigation / recovery plan":"mitigation","Date closed":"closedOn","Comments":"comments"}},
   action:{sheet:"Action Tracker",map:{"Ref":"ref","Package":"pkg","Action":"title","Owner":"owner","Raised at":"source","Date raised":"raised","Due date":"due","Priority":"priority","Status":"status","Date closed":"closedOn","Update / comments":"notes"}},
+  event:{sheet:"Timeline",map:{"Ref":"ref","Package":"pkg","Date":"date","Type":"type","Event":"title","Impact":"impact","Related ref":"related","Who":"who","Details / outcome":"notes"}},
   todo:{sheet:"To-Do List",map:{"Ref":"ref","Package":"pkg","Task":"title","Who":"owner","Due date":"due","Priority":"priority","Status":"status","Notes":"notes"}}
 };
-const DATEK=new Set(["identified","original","revised","closedOn","raised","due"]);
+const DATEK=new Set(["identified","original","revised","closedOn","raised","due","date"]);
 const p2=n=>String(n).padStart(2,"0");
 function iso(v){
   if(typeof v==="number"&&v>20000){const d=new Date(Math.round((v-25569)*864e5));return d.getUTCFullYear()+"-"+p2(d.getUTCMonth()+1)+"-"+p2(d.getUTCDate())}
@@ -845,9 +1066,39 @@ function iso(v){
     m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/);if(m){const y=m[3].length===2?"20"+m[3]:m[3];return y+"-"+p2(m[2])+"-"+p2(m[1])}}
   return "";
 }
+function parsePctProgress(rows,hi,T){
+  const head=rows[hi].map(T), ci=n=>head.indexOf(n);
+  const c={item:ci("Item"),mat:ci("Material %"),lab:ci("Labour %"),comments:ci("Comments")};
+  const P={mode:"pct",meta:{},sections:[],issues:"",look:{planned:"",deliveries:"",tests:""}};
+  const MK={"Project":"project","Contractor":"contractor","Scope basis":"scope","Reporting period":"period","Report date":"reportDate","Prepared by":"preparedBy"};
+  rows.slice(0,hi).forEach(r=>{const k=MK[T(r[0])];if(k)P.meta[k]=k==="reportDate"?(iso(r[1])||T(r[1])):T(r[1])});
+  const toP=v=>{if(v===""||v==null)return "";if(typeof v==="number")return String(Math.round(v*1000)/10);const n=num(String(v).replace(/%\s*$/,""));return n==null?"":String(n)};
+  let sec=null;
+  for(let i=hi+1;i<rows.length;i++){
+    const r=rows[i],a=T(r[0]),b=T(r[c.item]);
+    if(/^Overall progress|^Issues, risks/i.test(a))break;
+    if(!a&&!b)continue;
+    if(a&&!b){const m=a.match(/^(\d+(?:\.\d+)*)\s+(.+)$/);sec={sor:m?m[1]:"",name:m?m[2]:a,lines:[]};P.sections.push(sec);continue}
+    if(!sec){sec={sor:"",name:"Items",lines:[]};P.sections.push(sec)}
+    const labRaw=T(r[c.lab]), single=/^(–|-|—|n\/a)$/i.test(labRaw);
+    const l={id:"P"+(a||i),sor:a,item:b,pm:true,comments:c.comments>=0?T(r[c.comments]):""};
+    if(single){l.single=true;l.pct=toP(r[c.mat])}else{l.mat=toP(r[c.mat]);l.lab=toP(r[c.lab])}
+    sec.lines.push(l);
+  }
+  return P;
+}
 function parseProgress(ws){
   const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:""});
   const T=v=>String(v==null?"":v).trim();
+  const phi=rows.findIndex(r=>T(r[0])==="Ref"&&r.map(T).includes("Material %"));
+  if(phi>=0){
+    const P=parsePctProgress(rows,phi,T);
+    const ii=rows.findIndex(r=>/^Issues, risks/i.test(T(r[0]))), li=rows.findIndex(r=>/^Look-ahead/i.test(T(r[0])));
+    if(ii>=0)P.issues=rows.slice(ii+1,li>ii?li:rows.length).map(r=>r.map(T).filter(Boolean).join(" ")).filter(Boolean).join("\n");
+    const LK={"Planned activity / rows:":"planned","Material deliveries due:":"deliveries","Tests and inspections planned:":"tests"};
+    if(li>=0)rows.slice(li+1).forEach(r=>{const k=LK[T(r[0])];if(k)P.look[k]=r.slice(1).map(T).filter(Boolean).join(" ")});
+    return P.sections.some(s=>s.lines.length)?P:null;
+  }
   const hi=rows.findIndex(r=>T(r[0])==="SOR"&&r.map(T).includes("Done to date"));if(hi<0)return null;
   const head=rows[hi].map(T), ci=n=>head.indexOf(n);
   const c={item:ci("Line item"),unit:ci("Unit"),qty:ci("Scope qty"),done:ci("Done to date"),comments:ci("Comments")};
@@ -877,21 +1128,22 @@ async function importXlsx(file){
   let added=0,updated=0,n=0;const out=[];const base=Date.now();
   for(const kind of Object.keys(XL)){
     const ws=wbk.Sheets[XL[kind].sheet];if(!ws)continue;
-    const map=XL[kind].map, titleHead=Object.keys(map)[2];
+    const map=XL[kind].map, titleHead=Object.keys(map).find(h=>map[h]==="title");
     const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:""});
     const hi=rows.findIndex(r=>r.map(x=>String(x).trim()).includes(titleHead));if(hi<0)continue;
     const head=rows[hi].map(x=>String(x).trim());
     for(const r of rows.slice(hi+1)){
       const o={};head.forEach((h,c)=>{if(map[h])o[map[h]]=r[c]});
       const title=String(o.title==null?"":o.title).trim(), pkg=String(o.pkg||"").trim().toUpperCase();
-      if(!title||!PKGS.some(p=>p.id===pkg))continue;
+      let pk=pkg;if(kind==="event"&&/^(ALL|PRJ|PROJECT|ALL PACKAGES)$/.test(pk))pk="ALL";
+      if(!title||!(PKGS.some(p=>p.id===pk)||(kind==="event"&&pk==="ALL")))continue;
       const S=SCHEMA[kind], fref=String(o.ref||"").trim();
       const ex=fref&&byRef.get(kind+"|"+fref);
       const it=ex?{...ex}:{id:newId(),kind,createdAt:base+(n++)};
       S.fields.forEach(f=>{if(f.t==="pkg")return;const v=o[f.k];it[f.k]=DATEK.has(f.k)?iso(v):String(v==null?"":v).trim()});
-      const so=S.fields.find(f=>f.k==="status").o;if(!so.includes(it.status))it.status=so[0];
-      it.pkg=pkg;
-      it.ref=ex?ex.ref:(fref||nextRef(kind,pkg,it.id));
+      const sf=S.fields.find(f=>f.k==="status");if(sf&&!sf.o.includes(it.status))it.status=sf.o[0];
+      it.pkg=pk;
+      it.ref=ex?ex.ref:(fref||nextRef(kind,pk,it.id));
       if(o.closedOn)it.closedOn=iso(o.closedOn);
       if(isClosed(it)&&!it.closedOn)it.closedOn=today();
       if(!isClosed(it))delete it.closedOn;
@@ -900,19 +1152,22 @@ async function importXlsx(file){
       ex?updated++:added++;
     }
   }
-  let progDone=false;
+  const progDoneFor=[];
   for(const name of wbk.SheetNames){
     if(Object.values(XL).some(x=>x.sheet===name))continue;
-    const P=parseProgress(wbk.Sheets[name]);
-    if(P){progress.ML=P;progDone=true;break}
+    const P=parseProgress(wbk.Sheets[name]);if(!P)continue;
+    const m=name.match(/^(FSA|MYD|ML)\b/i), pk=m?m[1].toUpperCase():(P.mode==="pct"?"FSA":"ML");
+    if(progDoneFor.includes(pk))continue;
+    progress[pk]=P;progDoneFor.push(pk);
   }
+  const progDone=progDoneFor.length>0;
   if(!out.length&&!progDone){toast("No entries found. Use the tracker spreadsheet or the ML progress report.");return}
   render();
-  if(progDone)saveProg("ML");
+  progDoneFor.forEach(pk=>saveProg(pk));
   if(mode==="db"){for(const it of out){try{await db.collection("items").doc(it.id).set(it)}catch(e){failed(e);return}}}else saveLocal();
   const msg=[];
   if(out.length)msg.push(`Imported ${added} new and updated ${updated} existing entr${added+updated===1?"y":"ies"}.`);
-  if(progDone)msg.push("ML progress report imported.");
+  if(progDone){const n=progDoneFor.map(pkgLabel);msg.push((n.length>1?n.slice(0,-1).join(", ")+" and "+n[n.length-1]:n[0])+" progress imported.")}
   toast(msg.join(" "));
 }
 async function exportXlsx(){
@@ -929,9 +1184,10 @@ async function exportXlsx(){
   const dt=s=>s?new Date(s+"T00:00:00"):"";
   for(const kind of Object.keys(XL)){
     const m=XL[kind].map, heads=Object.keys(m), keys=heads.map(h=>m[h]);
-    const list=all(kind).sort((x,y)=>(x.createdAt||0)-(y.createdAt||0));
-    const rows=[heads.concat(kind==="delay"?"Slip (days)":"Overdue")].concat(list.map(i=>keys.map(k=>DATEK.has(k)?dt(i[k]):(i[k]||""))
-      .concat(kind==="delay"?(slip(i)==null?"":slip(i)):(overdue(i)?"Overdue":""))));
+    const list=all(kind).sort(kind==="event"?(x,y)=>(x.date||"9999").localeCompare(y.date||"9999")||(x.createdAt||0)-(y.createdAt||0):(x,y)=>(x.createdAt||0)-(y.createdAt||0));
+    const ex=kind==="delay"?"Slip (days)":kind==="event"?null:"Overdue";
+    const rows=[ex?heads.concat(ex):heads].concat(list.map(i=>{const r=keys.map(k=>DATEK.has(k)?dt(i[k]):(k==="pkg"&&i.pkg==="ALL"?"All":(i[k]||"")));
+      return ex?r.concat(kind==="delay"?(slip(i)==null?"":slip(i)):(overdue(i)?"Overdue":"")):r}));
     const ws=XLSX.utils.aoa_to_sheet(rows,{dateNF:"dd-mmm-yy"});
     ws["!cols"]=rows[0].map(h=>({wch:/description|^Action$|^Task$|plan|comments|Notes/i.test(h)?42:14}));
     ws["!autofilter"]={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(rows.length-1,1),c:rows[0].length-1}})};
@@ -941,17 +1197,20 @@ async function exportXlsx(){
     const P=getProg(pk.id);if(!P)return;
     const aoa=[[(P.meta.project?P.meta.project.split(" – ")[0]:pk.id)+" – Mechanical Progress Report"],[]];
     PMETA.forEach(([k,l])=>aoa.push([l,k==="reportDate"&&P.meta[k]?new Date(iso(P.meta[k])+"T00:00:00"):(P.meta[k]||"")]));
-    aoa.push([],["Progress by line item"],["SOR","Line item","Unit","Scope qty","Done to date","% complete","Comments"]);
-    const pctCells=[];
-    P.sections.forEach(sec=>{aoa.push([sec.name]);sec.lines.forEach(l=>{const pc=linePct(l);
-      aoa.push([num(l.sor)!=null?num(l.sor):l.sor,l.item,l.unit,num(l.qty)!=null?num(l.qty):l.qty,num(l.done)!=null?num(l.done):l.done,pc==null?"":pc,l.comments]);
+    const pm=isPm(P), pcCol=pm?4:5, pctCells=[], fracCells=[];
+    aoa.push([],["Progress by line item"],pm?["Ref","Item","Material %","Labour %","% complete","Comments"]:["SOR","Line item","Unit","Scope qty","Done to date","% complete","Comments"]);
+    const frac=v=>{const n=num(v);return n==null?0:Math.min(Math.max(n,0),100)/100};
+    P.sections.forEach(sec=>{aoa.push([(pm&&sec.sor?sec.sor+" ":"")+sec.name]);sec.lines.forEach(l=>{const pc=linePct(l);
+      if(pm){aoa.push([l.sor,l.item,l.single?frac(l.pct):frac(l.mat),l.single?"–":frac(l.lab),pc,l.comments]);fracCells.push(aoa.length-1)}
+      else aoa.push([num(l.sor)!=null?num(l.sor):l.sor,l.item,l.unit,num(l.qty)!=null?num(l.qty):l.qty,num(l.done)!=null?num(l.done):l.done,pc==null?"":pc,l.comments]);
       if(pc!=null)pctCells.push(aoa.length-1)})});
-    aoa.push(["Overall progress (average of quantified line items)","","","","",avgPct(allLines(P)).avg]);pctCells.push(aoa.length-1);
+    const ovr=[overLabel(P)];while(ovr.length<pcCol)ovr.push("");ovr.push(avgPct(allLines(P)).avg);aoa.push(ovr);pctCells.push(aoa.length-1);
     aoa.push([],["Issues, risks & scope clarifications"],[P.issues||""],[],["Look-ahead – next period"]);
     PLOOK.forEach(([k,l])=>aoa.push([l+":",(P.look||{})[k]||""]));
     const ws=XLSX.utils.aoa_to_sheet(aoa,{dateNF:"dd/mm/yyyy"});
-    pctCells.forEach(r=>{const a=XLSX.utils.encode_cell({r,c:5});if(ws[a]&&typeof ws[a].v==="number")ws[a].z="0%"});
-    ws["!cols"]=[{wch:16},{wch:40},{wch:8},{wch:11},{wch:13},{wch:11},{wch:30}];
+    pctCells.forEach(r=>{const a=XLSX.utils.encode_cell({r,c:pcCol});if(ws[a]&&typeof ws[a].v==="number")ws[a].z="0%"});
+    fracCells.forEach(r=>[2,3].forEach(c=>{const a=XLSX.utils.encode_cell({r,c});if(ws[a]&&typeof ws[a].v==="number")ws[a].z="0%"}));
+    ws["!cols"]=pm?[{wch:10},{wch:44},{wch:12},{wch:12},{wch:12},{wch:34}]:[{wch:16},{wch:40},{wch:8},{wch:11},{wch:13},{wch:11},{wch:30}];
     XLSX.utils.book_append_sheet(wbk,ws,pk.id+" Progress");
   });
   const buf=XLSX.write(wbk,{bookType:"xlsx",type:"array"});
@@ -975,11 +1234,11 @@ let tt;function toast(m){const t=$("toast");t.textContent=m;t.classList.add("on"
 /* ---------- other events ---------- */
 $("lanes").addEventListener("click",e=>{const b=e.target.closest(".lane");if(!b)return;
   pkgFilter=pkgFilter===b.dataset.pkg?"ALL":b.dataset.pkg;if(pkgFilter!=="ALL"){newPkg=pkgFilter;progPkg=pkgFilter}render()});
-$("tabs").addEventListener("click",e=>{const b=e.target.closest(".tab");if(!b)return;view=b.dataset.k;render()});
+$("tabs").addEventListener("click",e=>{const b=e.target.closest(".tab");if(!b)return;enterView(b.dataset.k);render()});
 $("tabs").addEventListener("keydown",e=>{
   if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft")return;
   const ks=Object.keys(SCHEMA).concat("progress");let i=ks.indexOf(view)+(e.key==="ArrowRight"?1:-1);
-  view=ks[(i+ks.length)%ks.length];render();document.querySelector(`.tab[data-k="${view}"]`).focus();
+  enterView(ks[(i+ks.length)%ks.length]);render();document.querySelector(`.tab[data-k="${view}"]`).focus();
 });
 $("q").addEventListener("input",e=>{q=e.target.value;renderFilterline();syncTable()});
 $("hideClosed").addEventListener("change",e=>{hideClosed=e.target.checked;syncTable()});
