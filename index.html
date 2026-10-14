@@ -228,6 +228,18 @@ td.dc{text-align:center}
 .grid td.done{background:var(--inbg)}
 .grid tr.over td.done{box-shadow:inset 0 0 0 2px var(--warn)}
 .cell.num{text-align:right;font-variant-numeric:tabular-nums}
+#lahead{display:flex;flex-wrap:wrap;align-items:flex-start;gap:10px;margin:0 0 12px}
+.lactl{display:flex;flex-direction:column;justify-content:center;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 12px}
+.lactl label{display:flex;align-items:center;gap:8px;font-size:.84rem;color:var(--muted);font-weight:600}
+.lactl input[type=date]{border:1px solid var(--line);background:var(--paper);border-radius:6px;padding:5px 8px}
+.lactl .nav{display:flex;gap:6px}
+.lactl .nav button{border:1px solid var(--line);background:var(--paper);border-radius:6px;padding:4px 10px;cursor:pointer;font-weight:600;color:var(--ink)}
+.lawk{flex:1 1 260px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:6px;padding:9px 14px}
+.lawk h4{margin:0;font-size:.95rem;font-stretch:80%;font-weight:800;color:var(--accent)}
+.lawk h4 span{font-weight:500;color:var(--muted);font-stretch:100%;font-size:.8rem;margin-left:6px}
+.lawk .cnt{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:5px;font-size:.88rem}
+.lawk .cnt b{font-size:1.05rem}
+.lawk .tot{margin-left:auto;color:var(--muted)}
 .ast{display:inline-block;padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700;white-space:nowrap}
 .ast.ontrack{background:var(--okbg);color:var(--ok)}
 .ast.slipping{background:var(--ambg);color:var(--warn)}
@@ -324,6 +336,7 @@ tr.full .pcw .pbar i{background:var(--ok)} tr.full .pcw b{color:var(--ok)}
     </div>
   </div>
   <p class="filterline" id="filterline"></p>
+  <div id="lahead" hidden></div>
   <div class="tablebox" id="tablebox"></div>
   <div id="progbox" hidden></div>
   <div id="tlbox" hidden></div>
@@ -363,6 +376,11 @@ const SCHEMA={
     {k:"impact",t:"select",o:["None","Programme","Cost","Programme and cost"]},
     {k:"related",t:"text"},{k:"who",t:"text"},{k:"notes",t:"area"}
   ]},
+  look:{tab:"2 Week Look Ahead",noun:"look-ahead entry",letter:"L",closed:"__never__",fields:[
+    {k:"pkg",t:"pkg"},{k:"from",t:"date"},{k:"to",t:"date"},{k:"area",t:"text"},{k:"name",t:"text"},
+    {k:"role",t:"select",o:["Welder","Pipefitter","GO","Supervisor","Other"]},
+    {k:"title",t:"text"},{k:"comments",t:"area"}
+  ]},
   todo:{tab:"To-do",noun:"task",letter:"T",closed:"Complete",fields:[
     {k:"pkg",t:"pkg"},{k:"title",t:"text"},{k:"owner",t:"text"},{k:"company",t:"text"},{k:"due",t:"date"},
     {k:"priority",t:"select",o:["Low","Medium","High"]},
@@ -370,7 +388,7 @@ const SCHEMA={
     {k:"notes",t:"area"}
   ]}
 };
-(()=>{const e=SCHEMA.event;delete SCHEMA.event;SCHEMA.event=e})();
+(()=>{for(const k of ["event","look"]){const e=SCHEMA[k];delete SCHEMA[k];SCHEMA[k]=e}})();
 const STATUS_MAP={todo:{"To do":"Not started","Doing":"In Progress","In progress":"In Progress","Done":"Complete"},action:{"In progress":"Open"}};
 function normItem(i){const m=STATUS_MAP[i.kind];if(m&&m[i.status])i.status=m[i.status];
   if(i.kind==="action"&&i.status==="Closed"&&!i.closedOn){const d=i.updatedAt?new Date(i.updatedAt):new Date();i.closedOn=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
@@ -446,6 +464,21 @@ const days=(a,b)=>(a&&b)?Math.round((Date.parse(b+"T00:00:00")-Date.parse(a+"T00
 const newId=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2,10));
 const isClosed=i=>i.kind==="action"?!!i.closedOn:i.status===SCHEMA[i.kind].closed;
 const SLIP_DAYS=7;
+const addDays=(d,n)=>{const x=new Date(d+"T00:00:00");x.setDate(x.getDate()+n);return x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0")};
+const mondayOf=d=>{const x=new Date(d+"T00:00:00"), wd=(x.getDay()+6)%7;return addDays(d,-wd)};
+let laStart=mondayOf(today()), laAll=false;
+const laEnd=()=>addDays(laStart,13);
+const overlaps=(i,a,b)=>{const f=i.from||i.to, t=i.to||i.from;return !!f&&f<=b&&t>=a};
+function laWeeks(){return [{n:1,a:laStart,b:addDays(laStart,6)},{n:2,a:addDays(laStart,7),b:addDays(laStart,13)}]}
+function crew(list,a,b){
+  const roles={},seen=new Set();
+  list.filter(i=>overlaps(i,a,b)).forEach(i=>{const key=(i.name||"").trim().toLowerCase()||"row:"+i.id;
+    if(seen.has(key+"|"+(i.role||"")))return;seen.add(key+"|"+(i.role||""));const r=i.role||"No role";roles[r]=(roles[r]||0)+1});
+  const people=new Set(list.filter(i=>overlaps(i,a,b)).map(i=>(i.name||"").trim().toLowerCase()||"row:"+i.id)).size;
+  return {roles,people};
+}
+const roleOrder=["Welder","Pipefitter","GO","Supervisor","Other","No role"];
+const plural=(n,w)=>n+" "+(n===1?w:(w==="GO"?"GOs":w+"s"));
 function actStatus(i){
   if(i.closedOn)return "Closed";
   if(!i.due||i.due>=today())return "On track";
@@ -492,6 +525,14 @@ const GRID={
     {k:"related",l:"Related ref",t:"text",w:130},
     {k:"who",l:"Who",t:"text",w:140},
     {k:"notes",l:"Details / outcome",t:"long",w:320}],
+  look:[REF,PKG,
+    {k:"from",l:"From",t:"date",w:136},
+    {k:"to",l:"To",t:"date",w:136},
+    {k:"area",l:"Area",t:"text",w:170},
+    {k:"name",l:"Name",t:"text",w:170},
+    {k:"role",l:"Role",t:"select",w:132},
+    {k:"title",l:"Description of work",t:"long",w:340},
+    {k:"comments",l:"Comments",t:"long",w:260}],
   todo:[REF,PKG,
     {k:"title",l:"Task",t:"long",w:300},
     {k:"owner",l:"Owner",t:"text",w:140},
@@ -585,7 +626,7 @@ function renderTabs(){
     return `<button class="tab" role="tab" data-k="${k}" aria-selected="${view===k}">${SCHEMA[k].tab}<span class="n">${n}</span></button>`}).join("")
     +`<button class="tab" role="tab" data-k="progress" aria-selected="${view==="progress"}">Progress</button>`;
   $("tools").hidden=view==="progress";
-  $("tlseg").hidden=view!=="event";$("hcwrap").hidden=view==="event";
+  $("tlseg").hidden=view!=="event";$("hcwrap").hidden=view==="event"||view==="look";
   $("listPdfBtn").hidden=!(downloads&&window.jspdf)||view==="progress";
   $("tlseg").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.tl===tlView()));
 }
@@ -601,11 +642,23 @@ function renderFilterline(){
   if(pkgFilter!=="ALL")bits.push(`Showing ${pkgFilter} only. <button data-clear="pkg">Show all packages</button>`);
   if(q.trim())bits.push(`Matching "${esc(q.trim())}". <button data-clear="q">Clear search</button>`);
   if(view==="event"&&tlView()==="timeline")bits.push(all("event",pkgFilter).length?"Newest at the bottom. Click an event to edit it in the table.":"");
+  if(view==="look")bits.push(laAll?"Showing all dates.":`Showing work planned between ${dShort(laStart)} and ${dShort(laEnd())}. Use one row per person; Copy on a row adds another person to the same work.`);
   if(view==="action")bits.push(`Status is automatic: <b>On track</b> until the due date, <b>Slipping</b> up to ${SLIP_DAYS} days late, <b>Issue</b> after that, and <b>Closed</b> once a Date Closed is entered.`);
   if(!readOnly&&!(view==="event"&&tlView()==="timeline"))bits.push(`Click any cell to type; changes save as you go. Enter moves down, Shift+Enter starts a new line. Type in the last row to add ${aN(SCHEMA[view].noun)}.`);
   $("filterline").innerHTML=bits.join(" ");
 }
-function renderChrome(){renderLanes();renderTabs();renderSync();renderName();renderLogo()}
+function renderLaHead(){
+  const el=$("lahead");if(view!=="look"){el.hidden=true;return}
+  el.hidden=false;
+  const list=all("look",pkgFilter);
+  const wk=laWeeks().map(w=>{const c=crew(list,w.a,w.b);
+    const parts=roleOrder.filter(r=>c.roles[r]).map(r=>`<span><b>${c.roles[r]}</b> ${r==="No role"?"no role set":esc(plural(c.roles[r],r).replace(/^\d+ /,""))}</span>`).join("");
+    return `<div class="lawk"><h4>Week ${w.n}<span>${dShort(w.a)} to ${dShort(addDays(w.a,4))}</span></h4><div class="cnt">${parts||'<span style="color:var(--muted)">Nobody planned yet</span>'}<span class="tot">${c.people} ${c.people===1?"person":"people"}</span></div></div>`}).join("");
+  el.innerHTML=`<div class="lactl"><label>Look-ahead from <input type="date" id="laStart" value="${laStart}"></label>
+    <div class="nav"><button data-lanav="-7" title="Previous week">◀ Week</button><button data-lanav="0">This week</button><button data-lanav="7" title="Next week">Week ▶</button></div>
+    <label><input type="checkbox" id="laAll"${laAll?" checked":""}> Show all dates</label></div>${wk}`;
+}
+function renderChrome(){renderLanes();renderTabs();renderSync();renderName();renderLogo();renderLaHead()}
 function render(){renderChrome();renderFilterline();syncTable()}
 
 /* ---------- render: grid ---------- */
@@ -613,12 +666,14 @@ function filtered(){
   const s=q.trim().toLowerCase();
   let list=all(view,pkgFilter);
   if(hideClosed)list=list.filter(i=>!isClosed(i));
-  if(s)list=list.filter(i=>[i.ref,i.title,i.owner,i.responsible,i.notes,i.mitigation,i.comments,i.cause,i.source,i.type,i.related,i.who,i.company,i.kind==="action"?actStatus(i):""].some(v=>v&&String(v).toLowerCase().includes(s)));
+  if(s)list=list.filter(i=>[i.ref,i.title,i.owner,i.responsible,i.notes,i.mitigation,i.comments,i.cause,i.source,i.type,i.related,i.who,i.company,i.area,i.name,i.role,i.kind==="action"?actStatus(i):""].some(v=>v&&String(v).toLowerCase().includes(s)));
+  if(view==="look"){if(!laAll)list=list.filter(i=>!(i.from||i.to)||overlaps(i,laStart,laEnd()));
+    return list.sort((a,b)=>(a.from||a.to||"9999").localeCompare(b.from||b.to||"9999")||String(a.area||"").localeCompare(String(b.area||""))||(a.createdAt||0)-(b.createdAt||0))}
   if(view==="event")return list.sort((a,b)=>(a.date||"9999").localeCompare(b.date||"9999")||(a.createdAt||0)-(b.createdAt||0));
   return list.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)||String(a.ref).localeCompare(String(b.ref)));
 }
 function grow(el){el.style.height="auto";el.style.height=Math.max(36,el.scrollHeight)+"px"}
-function delCell(i){return readOnly?"<td></td>":`<td class="dc"><button class="del" aria-label="Delete ${esc(i.ref)}" title="Delete row">×</button></td>`}
+function delCell(i){return readOnly?"<td></td>":`<td class="dc">${i.kind==="look"?`<button class="ra" data-dup="1" title="Copy this row for another person on the same work">Copy</button>`:""}<button class="del" aria-label="Delete ${esc(i.ref)}" title="Delete row">×</button></td>`}
 function rowHtml(i){
   const isNew=!i, dis=readOnly?" disabled":"";
   const tds=GRID[view].map(c=>{
@@ -653,8 +708,8 @@ function restoreFocus(f,root){
 }
 function fullTable(list){
   const box=$("tablebox"), fk=captureFocus(), cols=GRID[view];
-  const w=cols.reduce((s,c)=>s+c.w,0)+40;
-  box.innerHTML=`<table class="grid" style="width:${w}px"><colgroup>${cols.map(c=>`<col style="width:${c.w}px">`).join("")}<col style="width:40px"></colgroup>
+  const dw=view==="look"?88:40, w=cols.reduce((s,c)=>s+c.w,0)+dw;
+  box.innerHTML=`<table class="grid" style="width:${w}px"><colgroup>${cols.map(c=>`<col style="width:${c.w}px">`).join("")}<col style="width:${dw}px"></colgroup>
     <thead><tr>${cols.map(c=>`<th scope="col" title="${esc(c.l)}">${esc(c.l)}</th>`).join("")}<th aria-label="Delete row"></th></tr></thead>
     <tbody>${list.map(rowHtml).join("")}${readOnly?"":rowHtml(null)}</tbody></table>${readOnly&&!list.length?'<div class="empty">Nothing recorded here yet.</div>':""}`;
   rowSig=new Map(list.map(i=>[i.id,sig(i)]));
@@ -779,10 +834,10 @@ function syncTable(){
   if(view==="event"&&tlView()==="timeline"){$("tablebox").hidden=true;$("tlbox").hidden=false;renderTimeline();return}
   $("tlbox").hidden=true;
   $("tablebox").hidden=false;$("progbox").hidden=true;progRendered.sig=null;
-  const list=filtered(), key=[view,pkgFilter,q,hideClosed,readOnly].join("|");
+  const list=filtered(), key=[view,pkgFilter,q,hideClosed,readOnly,view==="look"?laStart+laAll:""].join("|");
   const tb=$("tablebox").querySelector("tbody");
   const dom=tb?[...tb.children].map(t=>t.dataset.id).filter(x=>x!=="new").join(","):null;
-  const ids=list.map(i=>i.id), same=view==="event"&&dom!=null?dom.split(",").filter(Boolean).sort().join(",")===ids.slice().sort().join(","):dom===ids.join(",");
+  const ids=list.map(i=>i.id), same=(view==="event"||view==="look")&&dom!=null?dom.split(",").filter(Boolean).sort().join(",")===ids.slice().sort().join(","):dom===ids.join(",");
   if(!tb||key!==tableKey||!same){tableKey=key;fullTable(list);return}
   list.forEach(i=>{if(rowSig.get(i.id)!==sig(i)){const tr=tb.querySelector(`tr[data-id="${i.id}"]`);if(tr)patchRow(tr,i)}});
 }
@@ -814,6 +869,12 @@ function openEventInTable(id){
   const tr=$("tablebox").querySelector(`tr[data-id="${id}"]`);if(!tr)return;
   tr.scrollIntoView({block:"center"});const el=tr.querySelector('.cell[data-k="title"]');if(el)el.focus({preventScroll:true});
 }
+$("lahead").addEventListener("change",e=>{
+  if(e.target.id==="laStart"&&e.target.value){laStart=mondayOf(e.target.value);render()}
+  if(e.target.id==="laAll"){laAll=e.target.checked;render()}
+});
+$("lahead").addEventListener("click",e=>{const b=e.target.closest("[data-lanav]");if(!b)return;
+  const n=+b.dataset.lanav;laStart=n===0?mondayOf(today()):addDays(laStart,n);render()});
 $("tlseg").addEventListener("click",e=>{const b=e.target.closest("[data-tl]");if(!b)return;tlMode=b.dataset.tl;tlManual=true;render()});
 $("tlbox").addEventListener("click",e=>{
   if(e.target.closest("[data-tlgo]")){tlMode="table";render();const t=$("tablebox").querySelector('tr.newrow .cell[data-k="title"]');if(t)t.focus();return}
@@ -834,6 +895,7 @@ function commit(el){
     if(view==="delay"){it.identified=today();it.eot="To be assessed"}
     if(view==="action")it.raised=today();
     if(view==="event"&&k!=="date")it.date=today();
+    if(view==="look"){if(k!=="from")it.from=laStart;if(k!=="to")it.to=addDays(laStart,4)}
     it[k]=val;it.ref=nextRef(view,it.pkg,it.id);
     tr.dataset.id=it.id;tr.classList.remove("newrow");
     const t=tr.querySelector('.cell[data-k="title"]');if(t)t.removeAttribute("placeholder");
@@ -871,6 +933,12 @@ box.addEventListener("keydown",e=>{
   }
 });
 box.addEventListener("click",e=>{
+  const dup=e.target.closest("[data-dup]");
+  if(dup&&!readOnly){const src=items.get(dup.closest("tr").dataset.id);if(!src)return;
+    const it={...src,id:newId(),createdAt:Date.now(),name:"",comments:""};it.ref=nextRef("look",it.pkg,it.id);
+    putItem(it);const tr=$("tablebox").querySelector(`tr[data-id="${it.id}"]`);
+    if(tr){tr.scrollIntoView({block:"nearest"});const n=tr.querySelector('.cell[data-k="name"]');if(n)n.focus()}
+    toast(`${it.ref} added. Type the next person's name.`);return}
   const b=e.target.closest(".del");if(!b)return;
   const it=items.get(b.closest("tr").dataset.id);if(!it)return;
   if(confirm(`Delete ${it.ref}${it.title?": "+it.title.slice(0,60):""}? This cannot be undone.`)){removeItem(it.id);toast(`${it.ref} deleted.`)}
@@ -1028,7 +1096,18 @@ const LIST_PDF={
     row:i=>[i.ref,pkgShort(i.pkg),dShort(i.date),i.type,i.title,i.impact&&i.impact!=="None"?i.impact:"",i.related,i.who,i.notes],
     tone:(i,c)=>c===5&&i.impact&&i.impact!=="None"?"red":null,
     summary:L=>{const d=L.map(i=>i.date).filter(Boolean).sort();
-      return [["Events recorded",L.length],["With programme or cost impact",L.filter(i=>i.impact&&i.impact!=="None").length],["Period covered",d.length?dShort(d[0])+" to "+dShort(d[d.length-1]):"–"]]}}
+      return [["Events recorded",L.length],["With programme or cost impact",L.filter(i=>i.impact&&i.impact!=="None").length],["Period covered",d.length?dShort(d[0])+" to "+dShort(d[d.length-1]):"–"]]},
+    group:i=>{const mk=i.date?i.date.slice(0,7):"none";return {key:mk,label:mk==="none"?"No date":new Date(mk+"-01T00:00:00").toLocaleDateString("en-GB",{month:"long",year:"numeric"})}}},
+  look:{title:"2 Week Look Ahead",
+    cols:[["Ref",17],["Pkg",13],["From",16],["To",16],["Area",32],["Name",34],["Role",22],["Description of work",80],["Comments",47]],
+    row:i=>[i.ref,pkgShort(i.pkg),dShort(i.from),dShort(i.to),i.area,i.name,i.role,i.title,i.comments],
+    tone:()=>null,
+    summary:L=>{const out=[];laWeeks().forEach(w=>{const c=crew(L,w.a,w.b);
+        out.push([`Week ${w.n} (${dShort(w.a)} to ${dShort(addDays(w.a,4))})`,(roleOrder.filter(r=>c.roles[r]&&r!=="No role").map(r=>plural(c.roles[r],r)).join(", ")||"Nobody planned")+(c.people?`  |  ${c.people} ${c.people===1?"person":"people"}`:"")])});
+      return out},
+    group:i=>{const f=i.from||i.to;if(!f)return {key:"none",label:"No dates set"};
+      const w=laWeeks().find(w=>overlaps(i,w.a,w.b));
+      return w?{key:"w"+w.n,label:`Week ${w.n}: ${dShort(w.a)} to ${dShort(addDays(w.a,6))}`}:{key:"o"+mondayOf(f),label:"Week commencing "+dShort(mondayOf(f))}}}
 };
 async function buildListPdf(kind,list,filterText){
   const {jsPDF}=window.jspdf, cfg=LIST_PDF[kind];
@@ -1052,9 +1131,9 @@ async function buildListPdf(kind,list,filterText){
   if(filterText)T(filterText,M+CW-4,y+11.6,{align:"right"});
   y+=hb+1.2+4;
   // key figures
-  const sm=cfg.summary(list), cw=Math.min(62,CW/sm.length), ch=11.5;
+  const sm=cfg.summary(list), cw=sm.length<=2?(CW-3*(sm.length-1))/sm.length:Math.min(62,CW/sm.length), ch=11.5;
   sm.forEach(([lab,val],k)=>{const x=M+k*(cw+3);rect(x,y,cw,ch,LAV);rect(x,y,1.2,ch,PUR);
-    F(7,false,MUT);T(lab,x+4,y+2);F(11,true,INK);T(String(val),x+4,y+5.6)});
+    F(7,false,MUT);T(lab,x+4,y+2);F(String(val).length>18?9:11,true,INK);T(String(val),x+4,y+5.6)});
   y+=ch+5;
   const cols=cfg.cols, scale=CW/cols.reduce((a,c)=>a+c[1],0), widths=cols.map(c=>c[1]*scale);
   const headRow=()=>{const h=lh+2*pad+0.6;let x=M;cols.forEach((c,k)=>{rect(x,y,widths[k],h,GOLD,true);F(fs,true,INK);
@@ -1064,14 +1143,14 @@ async function buildListPdf(kind,list,filterText){
   headRow();
   let lastMonth=null, zebra=false;
   list.forEach(i=>{
-    if(kind==="event"){const mk=i.date?i.date.slice(0,7):"none";
-      if(mk!==lastMonth){lastMonth=mk;const h=lh+2*pad;if(y+h+lh*2>BOTTOM)newPage();
-        rect(M,y,CW,h,LAV,true);F(fs,true,INK);T(mk==="none"?"No date":new Date(mk+"-01T00:00:00").toLocaleDateString("en-GB",{month:"long",year:"numeric"}),M+px,y+pad);y+=h;zebra=false}}
+    if(cfg.group){const g=cfg.group(i);
+      if(g.key!==lastMonth){lastMonth=g.key;const h=lh+2*pad;if(y+h+lh*2>BOTTOM)newPage();
+        rect(M,y,CW,h,LAV,true);F(fs,true,INK);T(g.label,M+px,y+pad);y+=h;zebra=false}}
     const vals=cfg.row(i);
     const cells=vals.map((v,k)=>{F(fs,k===0||!!cfg.tone(i,k),INK);return wrap(v,widths[k]-2*px)});
     const h=Math.max(...cells.map(c=>c.length),1)*lh+2*pad;
     if(y+h>BOTTOM)newPage();
-    const closed=kind!=="event"&&isClosed(i);
+    const closed=kind!=="event"&&kind!=="look"&&isClosed(i);
     let x=M;
     cells.forEach((c,k)=>{
       rect(x,y,widths[k],h,zebra?ZEBRA:null,true);
@@ -1095,7 +1174,8 @@ async function exportListPdf(){
   if(!list.length){toast(`There are no ${SCHEMA[view].tab.toLowerCase()} entries to put in a PDF with these filters.`);return}
   const bits=[pkgFilter==="ALL"?"All packages":pkgLabel(pkgFilter)];
   if(q.trim())bits.push(`search "${q.trim()}"`);
-  if(hideClosed&&view!=="event")bits.push("closed items hidden");
+  if(hideClosed&&view!=="event"&&view!=="look")bits.push("closed items hidden");
+  if(view==="look")bits.push(laAll?"all dates":"from "+dShort(laStart)+" to "+dShort(laEnd()));
   const btn=$("listPdfBtn");btn.disabled=true;btn.textContent="Preparing PDF…";
   try{
     const buf=await buildListPdf(view,list,bits.join(", "));
@@ -1225,10 +1305,11 @@ const XL={
   delay:{sheet:"Delay Log",map:{"Ref":"ref","Package":"pkg","Delay description":"title","Cause":"cause","Impact":"impact","Date identified":"identified","Responsible party":"responsible","Planned date":"original","Forecast date":"revised","Status":"status","EOT claim":"eot","Mitigation / recovery plan":"mitigation","Date closed":"closedOn","Comments":"comments"}},
   action:{sheet:"Action Tracker",map:{"Action No.":"ref","Package":"pkg","Description":"title","Raised in":"source","Date Raised":"raised","Act Owner":"owner","Due Date":"due","Date Closed":"closedOn","Status":"status","Comments/Response":"notes"},
     alias:{"Ref":"ref","Action":"title","Owner":"owner","Raised at":"source","Date raised":"raised","Due date":"due","Update / comments":"notes","Date closed":"closedOn"}},
+  look:{sheet:"Look Ahead",map:{"Ref":"ref","Package":"pkg","From":"from","To":"to","Area":"area","Name":"name","Role":"role","Description of work":"title","Comments":"comments"}},
   event:{sheet:"Timeline",map:{"Ref":"ref","Package":"pkg","Date":"date","Type":"type","Event":"title","Impact":"impact","Related ref":"related","Who":"who","Details / outcome":"notes"}},
   todo:{sheet:"To-Do List",map:{"Ref":"ref","Package":"pkg","Task":"title","Owner":"owner","Company":"company","Due date":"due","Priority":"priority","Status":"status","Notes":"notes"},alias:{"Who":"owner"}}
 };
-const DATEK=new Set(["identified","original","revised","closedOn","raised","due","date"]);
+const DATEK=new Set(["identified","original","revised","closedOn","raised","due","date","from","to"]);
 const p2=n=>String(n).padStart(2,"0");
 function iso(v){
   if(typeof v==="number"&&v>20000){const d=new Date(Math.round((v-25569)*864e5));return d.getUTCFullYear()+"-"+p2(d.getUTCMonth()+1)+"-"+p2(d.getUTCDate())}
