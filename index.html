@@ -82,6 +82,11 @@ body>.wrap{min-height:calc(100vh - 90px)}
 .brandbar .btn{background:transparent;color:var(--hdr-ink);border-color:var(--hdr-line);border-radius:999px;padding:7px 16px}
 .brandbar .btn:hover{background:var(--brand);border-color:var(--brand);color:#fff}
 .brandbar .btn:focus-visible{outline-color:var(--gold)}
+/* refresh button */
+.iconbtn{display:inline-flex;align-items:center;gap:7px}
+.iconbtn svg{width:15px;height:15px;flex:none}
+.iconbtn.spin svg{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 /* light / dark switch */
 .themesw{display:inline-flex;align-items:center;gap:8px;background:none;border:0;padding:4px 6px;cursor:pointer;color:var(--hdr-mut);font-size:.82rem;font-weight:600;border-radius:999px}
 .themesw:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
@@ -327,6 +332,44 @@ tr.full .pcw .pbar i{background:var(--ok)} tr.full .pcw b{color:var(--ok)}
   .tablebox{max-height:75vh}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+/* App layout: header, package boxes and tabs stay put; only the list under the tabs scrolls */
+@media (min-height:600px){
+  html,body{height:100%}
+  body{display:flex;flex-direction:column;overflow:hidden}
+  .brandbar{flex:none}
+  body>.wrap{flex:1 1 auto;min-height:0;width:100%;display:flex;flex-direction:column;padding-bottom:12px}
+  .wrap>.lanes,.wrap>.bar,.wrap>.filterline,#lahead{flex:none}
+  #tablebox,#progbox,#tlbox{flex:1 1 auto;min-height:120px;max-height:none;overflow:auto;overscroll-behavior:contain}
+  #progbox,#tlbox{padding-right:4px}
+}
+/* phones: package boxes become a swipeable row so the frozen area stays short */
+@media (max-width:760px){
+  .lanes{display:flex;overflow-x:auto;gap:8px;scroll-snap-type:x mandatory;padding-bottom:4px;margin-bottom:12px}
+  .lane{flex:0 0 86%;scroll-snap-align:start}
+  /* keep the frozen area compact on phones */
+  .filterline .tip{display:none}
+  .filterline{margin-bottom:6px}
+  .filterline:empty{display:none}
+  .brandin{padding:8px 10px 10px;gap:8px 10px}
+  .sub{display:none}
+  .logo img{height:38px!important}
+  .name{font-size:1.25rem}
+  .topbtns{flex-wrap:nowrap;overflow-x:auto;width:100%;padding-bottom:2px;scrollbar-width:none}
+  .brandbar .btn{padding:6px 12px;font-size:.84rem;white-space:nowrap;flex:none}
+  .themesw{flex:none}
+  body>.wrap{padding-top:10px}
+  .lane{padding:8px 10px;flex-basis:74%}
+  .lane .code{font-size:1.8rem}
+  .lane .pk,.lane .hint{display:none}
+  .lane dl{font-size:.76rem;gap:1px 10px}
+  .bar{gap:4px;margin-bottom:6px}
+  .tabs{flex-wrap:nowrap;overflow-x:auto;width:100%;margin-right:0;scrollbar-width:none}
+  .tab{white-space:nowrap;font-size:.95rem;padding:8px 10px}
+  .tools{flex-wrap:nowrap;padding-bottom:6px}
+  .search{width:auto;flex:1 1 auto;min-width:0}
+  #listPdfBtn,.chk{white-space:nowrap;flex:none}
+  .ptop{margin-bottom:8px}
+}
 </style>
 </head>
 <body>
@@ -339,6 +382,7 @@ tr.full .pcw .pbar i{background:var(--ok)} tr.full .pcw b{color:var(--ok)}
       <div class="sub"><span class="sync" id="sync"><i></i><span>Saved on this device</span></span></div>
     </div>
     <div class="topbtns">
+      <button class="btn iconbtn" id="refreshBtn" title="Reload the tracker to pick up the latest changes and app updates"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg><span>Refresh</span></button>
       <button class="themesw" id="themeSw" role="switch" aria-checked="false" aria-label="Dark mode"><span class="lbl" id="themeLbl">Light</span><span class="trk"><span class="knob"><svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.3M12 19.2v2.3M2.5 12h2.3M19.2 12h2.3M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg><svg class="moon" viewBox="0 0 24 24" fill="currentColor"><path d="M20.5 14.6A8.6 8.6 0 0 1 9.4 3.5a8.6 8.6 0 1 0 11.1 11.1z"/></svg></span></span></button>
       <button class="btn" id="importBtn" hidden>Import spreadsheet</button><input type="file" id="importFile" accept=".xlsx,.xls" hidden><button class="btn" id="xlsxBtn" hidden>Export to Excel</button><button class="btn" id="exportBtn" hidden>Export tab to CSV</button>
     </div>
@@ -658,16 +702,17 @@ function renderSync(){
   $("exportBtn").hidden=!downloads;$("xlsxBtn").hidden=!downloads||!window.XLSX;$("importBtn").hidden=readOnly||!window.XLSX;
 }
 function renderFilterline(){
-  if(view==="progress"){const P=getProg(progPkg);$("filterline").innerHTML=readOnly||!P?"":isPm(P)?"Enter % complete against Material and Labour under each item. Type in the shaded row at the end of a section to add a line item.":"Enter quantities in the Done to date column. Type in the shaded row at the end of a section to add a line item.";return}
+  if(view==="progress"){const P=getProg(progPkg);$("filterline").innerHTML=readOnly||!P?"":'<span class="tip">'+(isPm(P)?"Enter % complete against Material and Labour under each item. Type in the shaded row at the end of a section to add a line item.":"Enter quantities in the Done to date column. Type in the shaded row at the end of a section to add a line item.")+'</span>';return}
   const bits=[];
   if(pkgFilter!=="ALL")bits.push(`Showing ${pkgFilter} only. <button data-clear="pkg">Show all packages</button>`);
   {const ac=activeCols();if(ac.length&&view!=="progress")bits.push(`Filtered by ${ac.map(c=>esc(c.l)).join(", ")}. <button data-clear="cols">Clear column filters</button>`)}
   if(q.trim())bits.push(`Matching "${esc(q.trim())}". <button data-clear="q">Clear search</button>`);
-  if(view==="event"&&tlView()==="timeline")bits.push(all("event",pkgFilter).length?"Newest at the bottom. Click an event to edit it in the table.":"");
-  if(view==="look")bits.push(laAll?"Showing all dates.":`Showing work planned between ${dShort(laStart)} and ${dShort(laEnd())}. Use one row per person; Copy on a row adds another person to the same work.`);
-  if(view==="action")bits.push(`Status is automatic: <b>On track</b> until the due date, <b>Slipping</b> up to ${SLIP_DAYS} days late, <b>Issue</b> after that, and <b>Closed</b> once a Date Closed is entered.`);
-  if(!readOnly&&!(view==="event"&&tlView()==="timeline"))bits.push(`Click any cell to type; changes save as you go. Enter moves down, Shift+Enter starts a new line. Type in the last row to add ${aN(SCHEMA[view].noun)}.`);
-  $("filterline").innerHTML=bits.join(" ");
+  const tips=[];
+  if(view==="event"&&tlView()==="timeline")tips.push(all("event",pkgFilter).length?"Newest at the bottom. Click an event to edit it in the table.":"");
+  if(view==="look")tips.push(laAll?"Showing all dates.":`Showing work planned between ${dShort(laStart)} and ${dShort(laEnd())}. Use one row per person; Copy on a row adds another person to the same work.`);
+  if(view==="action")tips.push(`Status is automatic: <b>On track</b> until the due date, <b>Slipping</b> up to ${SLIP_DAYS} days late, <b>Issue</b> after that, and <b>Closed</b> once a Date Closed is entered.`);
+  if(!readOnly&&!(view==="event"&&tlView()==="timeline"))tips.push(`Click any cell to type; changes save as you go. Enter moves down, Shift+Enter starts a new line. Type in the last row to add ${aN(SCHEMA[view].noun)}.`);
+  $("filterline").innerHTML=bits.join(" ")+(tips.join("")?`${bits.length?" ":""}<span class="tip">${tips.join(" ")}</span>`:"");
 }
 function renderLaHead(){
   const el=$("lahead");if(view!=="look"){el.hidden=true;return}
@@ -983,7 +1028,9 @@ $("tablebox").addEventListener("click",e=>{const b=e.target.closest(".fbtn");if(
 document.addEventListener("mousedown",e=>{if(fpop&&!fpop.contains(e.target)&&!e.target.closest(".fbtn"))closeFilter()});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&fpop){closeFilter()}});
 window.addEventListener("resize",closeFilter);
-window.addEventListener("scroll",closeFilter);
+function repositionFilter(){if(!fpop)return;const b=$("tablebox").querySelector(`.fbtn[data-fk="${fpopK}"]`);if(b)placeFilter(b);else closeFilter()}
+window.addEventListener("scroll",repositionFilter);
+$("tablebox").addEventListener("scroll",repositionFilter);
 
 /* ---------- editing ---------- */
 function commit(el){
@@ -1613,6 +1660,14 @@ $("filterline").addEventListener("click",e=>{const c=e.target.dataset.clear;if(c
 const pn=$("pname");
 pn.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();pn.blur()}});
 pn.addEventListener("blur",()=>{const n=pn.textContent.trim()||"Project tracker";pn.textContent=n;if(n!==projectName&&!readOnly)saveName(n);document.title=n});
+
+/* ---------- refresh ---------- */
+$("refreshBtn").addEventListener("click",async()=>{
+  const b=$("refreshBtn");b.disabled=true;b.classList.add("spin");b.querySelector("span").textContent="Refreshing…";
+  const a=document.activeElement;if(a&&a!==document.body&&a.blur)a.blur();   // saves any cell still being typed in
+  try{if(navigator.serviceWorker){const r=await navigator.serviceWorker.getRegistration();if(r)await r.update()}}catch(e){}
+  setTimeout(()=>location.reload(),mode==="db"?700:200);
+});
 
 /* ---------- theme switch ---------- */
 $("themeSw").addEventListener("click",()=>applyTheme(curTheme()==="dark"?"light":"dark",true));
