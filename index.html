@@ -240,6 +240,27 @@ td.dc{text-align:center}
 .lawk .cnt{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:5px;font-size:.88rem}
 .lawk .cnt b{font-size:1.05rem}
 .lawk .tot{margin-left:auto;color:var(--muted)}
+.thw{display:flex;align-items:center;gap:4px}
+.thw span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.fbtn{border:0;background:none;color:var(--muted);cursor:pointer;padding:3px;border-radius:4px;display:flex;opacity:.45;flex:none}
+.grid th:hover .fbtn,.fbtn:focus-visible{opacity:1}
+.fbtn:hover{background:var(--soft);color:var(--ink)}
+.fbtn.on{opacity:1;color:#fff;background:var(--brand)}
+.fbtn svg{width:12px;height:12px}
+#fpop{position:fixed;z-index:30;width:min(290px,calc(100vw - 16px));background:var(--surface);border:1px solid var(--line);border-radius:8px;
+  box-shadow:0 12px 32px rgba(20,10,25,.2);padding:10px 12px 12px;color:var(--ink)}
+.fph{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.fph b{font-size:.92rem}
+.fpx{border:0;background:none;font-size:1.25rem;line-height:1;cursor:pointer;color:var(--muted);padding:2px 4px}
+.fptext{width:100%;border:1px solid var(--line);border-radius:6px;padding:7px 9px;background:var(--paper)}
+.fpall{display:flex;gap:8px;align-items:center;font-size:.84rem;font-weight:650;margin:10px 0 4px;padding:0 2px 7px;border-bottom:1px solid var(--soft);cursor:pointer}
+.fplist{max-height:240px;overflow:auto;display:flex;flex-direction:column}
+.fplist label{display:flex;align-items:center;gap:8px;font-size:.86rem;padding:4px 2px;cursor:pointer;border-radius:4px}
+.fplist label:hover{background:var(--soft)}
+.fplist span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fplist em{font-style:normal;color:var(--muted);font-size:.76rem}
+.fpnone{font-size:.84rem;color:var(--muted);padding:6px 2px}
+.fpf{display:flex;justify-content:space-between;gap:8px;margin-top:10px}
 .ast{display:inline-block;padding:2px 10px;border-radius:999px;font-size:.78rem;font-weight:700;white-space:nowrap}
 .ast.ontrack{background:var(--okbg);color:var(--ok)}
 .ast.slipping{background:var(--ambg);color:var(--warn)}
@@ -640,6 +661,7 @@ function renderFilterline(){
   if(view==="progress"){const P=getProg(progPkg);$("filterline").innerHTML=readOnly||!P?"":isPm(P)?"Enter % complete against Material and Labour under each item. Type in the shaded row at the end of a section to add a line item.":"Enter quantities in the Done to date column. Type in the shaded row at the end of a section to add a line item.";return}
   const bits=[];
   if(pkgFilter!=="ALL")bits.push(`Showing ${pkgFilter} only. <button data-clear="pkg">Show all packages</button>`);
+  {const ac=activeCols();if(ac.length&&view!=="progress")bits.push(`Filtered by ${ac.map(c=>esc(c.l)).join(", ")}. <button data-clear="cols">Clear column filters</button>`)}
   if(q.trim())bits.push(`Matching "${esc(q.trim())}". <button data-clear="q">Clear search</button>`);
   if(view==="event"&&tlView()==="timeline")bits.push(all("event",pkgFilter).length?"Newest at the bottom. Click an event to edit it in the table.":"");
   if(view==="look")bits.push(laAll?"Showing all dates.":`Showing work planned between ${dShort(laStart)} and ${dShort(laEnd())}. Use one row per person; Copy on a row adds another person to the same work.`);
@@ -662,10 +684,30 @@ function renderChrome(){renderLanes();renderTabs();renderSync();renderName();ren
 function render(){renderChrome();renderFilterline();syncTable()}
 
 /* ---------- render: grid ---------- */
-function filtered(){
+/* ---------- column filters ---------- */
+const colFilters={};
+function colText(i,c){
+  if(c.k==="_slip"){const x=slip(i);return x==null?"":(x>0?"+":"")+x+" d"}
+  if(c.k==="_ast")return actStatus(i);
+  if(c.k==="_od")return overdue(i)?"Overdue":"Not overdue";
+  if(c.k==="pkg")return i.pkg==="ALL"?"All":String(i.pkg||"");
+  if(c.t==="date")return i[c.k]?dShort(i[c.k]):"";
+  return String(i[c.k]==null?"":i[c.k]).trim();
+}
+const fActive=F=>F&&(F.vals||F.text);
+function activeCols(){const f=colFilters[view]||{};return (GRID[view]||[]).filter(c=>fActive(f[c.k]))}
+function passCols(i,skip){
+  const f=colFilters[view];if(!f||!GRID[view])return true;
+  for(const c of GRID[view]){if(c.k===skip)continue;const F=f[c.k];if(!fActive(F))continue;const v=colText(i,c);
+    if(F.vals&&!F.vals.includes(v))return false;
+    if(F.text&&!v.toLowerCase().includes(F.text.toLowerCase()))return false}
+  return true;
+}
+function filtered(skipCol){
   const s=q.trim().toLowerCase();
   let list=all(view,pkgFilter);
   if(hideClosed)list=list.filter(i=>!isClosed(i));
+  if(GRID[view])list=list.filter(i=>passCols(i,skipCol));
   if(s)list=list.filter(i=>[i.ref,i.title,i.owner,i.responsible,i.notes,i.mitigation,i.comments,i.cause,i.source,i.type,i.related,i.who,i.company,i.area,i.name,i.role,i.kind==="action"?actStatus(i):""].some(v=>v&&String(v).toLowerCase().includes(s)));
   if(view==="look"){if(!laAll)list=list.filter(i=>!(i.from||i.to)||overlaps(i,laStart,laEnd()));
     return list.sort((a,b)=>(a.from||a.to||"9999").localeCompare(b.from||b.to||"9999")||String(a.area||"").localeCompare(String(b.area||""))||(a.createdAt||0)-(b.createdAt||0))}
@@ -708,9 +750,9 @@ function restoreFocus(f,root){
 }
 function fullTable(list){
   const box=$("tablebox"), fk=captureFocus(), cols=GRID[view];
-  const dw=view==="look"?88:40, w=cols.reduce((s,c)=>s+c.w,0)+dw;
-  box.innerHTML=`<table class="grid" style="width:${w}px"><colgroup>${cols.map(c=>`<col style="width:${c.w}px">`).join("")}<col style="width:${dw}px"></colgroup>
-    <thead><tr>${cols.map(c=>`<th scope="col" title="${esc(c.l)}">${esc(c.l)}</th>`).join("")}<th aria-label="Delete row"></th></tr></thead>
+  const dw=view==="look"?88:40, w=cols.reduce((s,c)=>s+c.w+16,0)+dw;
+  box.innerHTML=`<table class="grid" style="width:${w}px"><colgroup>${cols.map(c=>`<col style="width:${c.w+16}px">`).join("")}<col style="width:${dw}px"></colgroup>
+    <thead><tr>${cols.map(c=>{const on=fActive((colFilters[view]||{})[c.k]);return `<th scope="col" title="${esc(c.l)}"><div class="thw"><span>${esc(c.l)}</span><button class="fbtn${on?" on":""}" data-fk="${c.k}" aria-label="Filter ${esc(c.l)}${on?" (filter on)":""}" title="Filter this column"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8.5V19l-4 2v-8.5z"/></svg></button></div></th>`}).join("")}<th aria-label="Delete row"></th></tr></thead>
     <tbody>${list.map(rowHtml).join("")}${readOnly?"":rowHtml(null)}</tbody></table>${readOnly&&!list.length?'<div class="empty">Nothing recorded here yet.</div>':""}`;
   rowSig=new Map(list.map(i=>[i.id,sig(i)]));
   box.querySelectorAll("textarea.cell").forEach(grow);
@@ -834,7 +876,7 @@ function syncTable(){
   if(view==="event"&&tlView()==="timeline"){$("tablebox").hidden=true;$("tlbox").hidden=false;renderTimeline();return}
   $("tlbox").hidden=true;
   $("tablebox").hidden=false;$("progbox").hidden=true;progRendered.sig=null;
-  const list=filtered(), key=[view,pkgFilter,q,hideClosed,readOnly,view==="look"?laStart+laAll:""].join("|");
+  const list=filtered(), key=[view,pkgFilter,q,hideClosed,readOnly,view==="look"?laStart+laAll:"",JSON.stringify(colFilters[view]||{})].join("|");
   const tb=$("tablebox").querySelector("tbody");
   const dom=tb?[...tb.children].map(t=>t.dataset.id).filter(x=>x!=="new").join(","):null;
   const ids=list.map(i=>i.id), same=(view==="event"||view==="look")&&dom!=null?dom.split(",").filter(Boolean).sort().join(",")===ids.slice().sort().join(","):dom===ids.join(",");
@@ -845,7 +887,7 @@ function syncTable(){
 /* ---------- timeline view ---------- */
 let tlMode=null, tlManual=false;
 function tlView(){return tlMode||"table"}
-function enterView(k){view=k;if(k==="event"&&!tlManual)tlMode=all("event").length?"timeline":"table"}
+function enterView(k){closeFilter();view=k;if(k==="event"&&!tlManual)tlMode=all("event").length?"timeline":"table"}
 function renderTimeline(){
   const list=filtered(), box=$("tlbox");
   if(!list.length){
@@ -881,6 +923,67 @@ $("tlbox").addEventListener("click",e=>{
   const li=e.target.closest("[data-open]");if(li)openEventInTable(li.dataset.open);
 });
 $("tlbox").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){const li=e.target.closest("[data-open]");if(li){e.preventDefault();openEventInTable(li.dataset.open)}}});
+
+/* ---------- column filter pop-up ---------- */
+let fpop=null, fpopK=null;
+function closeFilter(){if(fpop){fpop.remove();fpop=null;fpopK=null}}
+function placeFilter(btn){
+  if(!fpop)return;const r=btn.getBoundingClientRect(), w=fpop.offsetWidth;
+  fpop.style.top=Math.min(r.bottom+6,window.innerHeight-fpop.offsetHeight-8)+"px";
+  fpop.style.left=Math.max(8,Math.min(r.right-w,window.innerWidth-w-8))+"px";
+}
+function fillFilterList(){
+  if(!fpop)return;const c=GRID[view].find(x=>x.k===fpopK);if(!c||c.t==="long")return;
+  const F=(colFilters[view]||{})[fpopK]||{};
+  const m=new Map();filtered(fpopK).forEach(i=>{const v=colText(i,c);const e=m.get(v)||{n:0,key:c.t==="date"?(i[c.k]||""):c.k==="_slip"?(slip(i)??-1e9):v};e.n++;m.set(v,e)});
+  (F.vals||[]).forEach(v=>{if(!m.has(v))m.set(v,{n:0,key:v})});
+  const vals=[...m.entries()].sort((a,b)=>{if(a[0]===""&&b[0]!=="")return 1;if(b[0]===""&&a[0]!=="")return -1;
+    const x=a[1].key,y=b[1].key;return typeof x==="number"&&typeof y==="number"?x-y:String(x).localeCompare(String(y),undefined,{numeric:true})});
+  const ft=(F.text||"").toLowerCase();
+  const shown=vals.filter(([v])=>!ft||v.toLowerCase().includes(ft));
+  fpop.querySelector(".fpall input").checked=!F.vals;
+  fpop.querySelector(".fplist").innerHTML=shown.length?shown.map(([v,e])=>`<label><input type="checkbox" data-v="${esc(v)}"${!F.vals||F.vals.includes(v)?" checked":""}><span>${v===""?"<i>(Blank)</i>":esc(v)}</span><em>${e.n}</em></label>`).join(""):'<div class="fpnone">No matching values</div>';
+}
+function openFilter(k,btn){
+  if(fpopK===k){closeFilter();return}
+  closeFilter();
+  const c=GRID[view].find(x=>x.k===k);if(!c)return;
+  fpopK=k;const F=(colFilters[view]||{})[k]||{};
+  fpop=document.createElement("div");fpop.id="fpop";fpop.setAttribute("role","dialog");fpop.setAttribute("aria-label","Filter "+c.l);
+  fpop.innerHTML=`<div class="fph"><b>Filter: ${esc(c.l)}</b><button class="fpx" aria-label="Close filter">×</button></div>
+    <input type="search" class="fptext" placeholder="${c.t==="long"?"Show rows containing…":"Contains…"}" aria-label="Contains" value="${esc(F.text||"")}">
+    ${c.t==="long"?"":`<label class="fpall"><input type="checkbox"> Select all</label><div class="fplist"></div>`}
+    <div class="fpf"><button class="btn" data-fclear>Clear filter</button><button class="btn primary" data-fdone>Done</button></div>`;
+  document.body.appendChild(fpop);fillFilterList();placeFilter(btn);
+  fpop.querySelector(".fptext").focus();
+  fpop.addEventListener("input",e=>{if(e.target.classList.contains("fptext")){setFilter(F2=>{F2.text=e.target.value.trim()});fillFilterList()}});
+  fpop.addEventListener("change",e=>{
+    const t=e.target;if(t.type!=="checkbox")return;
+    if(t.closest(".fpall")){setFilter(F2=>{F2.vals=t.checked?null:[]});fillFilterList();return}
+    const boxes=[...fpop.querySelectorAll(".fplist input[data-v]")];
+    setFilter(F2=>{
+      const cur=new Set(F2.vals||[...(function(){const m=new Set();filtered(fpopK).forEach(i=>m.add(colText(i,c)));return m})()]);
+      boxes.forEach(b=>{if(b.checked)cur.add(b.dataset.v);else cur.delete(b.dataset.v)});
+      const allVals=new Set();filtered(fpopK).forEach(i=>allVals.add(colText(i,c)));
+      F2.vals=[...allVals].every(v=>cur.has(v))?null:[...cur];
+    });
+    fpop.querySelector(".fpall input").checked=!((colFilters[view]||{})[fpopK]||{}).vals;
+  });
+  fpop.addEventListener("click",e=>{
+    if(e.target.closest(".fpx")||e.target.closest("[data-fdone]")){closeFilter();return}
+    if(e.target.closest("[data-fclear]")){const f=colFilters[view];if(f)delete f[fpopK];closeFilter();render()}
+  });
+}
+function setFilter(fn){
+  const f=colFilters[view]||(colFilters[view]={});const F=Object.assign({vals:null,text:""},f[fpopK]||{});fn(F);
+  if(fActive(F))f[fpopK]=F;else delete f[fpopK];
+  render();
+}
+$("tablebox").addEventListener("click",e=>{const b=e.target.closest(".fbtn");if(b){e.stopPropagation();openFilter(b.dataset.fk,b)}},true);
+document.addEventListener("mousedown",e=>{if(fpop&&!fpop.contains(e.target)&&!e.target.closest(".fbtn"))closeFilter()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&fpop){closeFilter()}});
+window.addEventListener("resize",closeFilter);
+window.addEventListener("scroll",closeFilter);
 
 /* ---------- editing ---------- */
 function commit(el){
@@ -1175,6 +1278,7 @@ async function exportListPdf(){
   const bits=[pkgFilter==="ALL"?"All packages":pkgLabel(pkgFilter)];
   if(q.trim())bits.push(`search "${q.trim()}"`);
   if(hideClosed&&view!=="event"&&view!=="look")bits.push("closed items hidden");
+  {const ac=activeCols();if(ac.length)bits.push("filtered by "+ac.map(c=>c.l).join(", "))}
   if(view==="look")bits.push(laAll?"all dates":"from "+dShort(laStart)+" to "+dShort(laEnd()));
   const btn=$("listPdfBtn");btn.disabled=true;btn.textContent="Preparing PDF…";
   try{
@@ -1505,7 +1609,7 @@ $("tabs").addEventListener("keydown",e=>{
 $("q").addEventListener("input",e=>{q=e.target.value;renderFilterline();syncTable()});
 $("hideClosed").addEventListener("change",e=>{hideClosed=e.target.checked;syncTable()});
 $("exportBtn").addEventListener("click",exportCsv);
-$("filterline").addEventListener("click",e=>{const c=e.target.dataset.clear;if(c==="pkg")pkgFilter="ALL";if(c==="q"){q="";$("q").value=""}if(c)render()});
+$("filterline").addEventListener("click",e=>{const c=e.target.dataset.clear;if(c==="cols"){delete colFilters[view];closeFilter()}if(c==="pkg")pkgFilter="ALL";if(c==="q"){q="";$("q").value=""}if(c)render()});
 const pn=$("pname");
 pn.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();pn.blur()}});
 pn.addEventListener("blur",()=>{const n=pn.textContent.trim()||"Project tracker";pn.textContent=n;if(n!==projectName&&!readOnly)saveName(n);document.title=n});
