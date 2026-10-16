@@ -252,6 +252,19 @@ td.dc{text-align:center}
 .fbtn:hover{background:var(--soft);color:var(--ink)}
 .fbtn.on{opacity:1;color:#fff;background:var(--brand)}
 .fbtn svg{width:12px;height:12px}
+/* moving and resizing columns */
+.grid th[draggable="true"]{cursor:grab}
+.grid th.dragging{opacity:.45}
+.grid th.drop-l{box-shadow:inset 3px 0 0 var(--brand)}
+.grid th.drop-r{box-shadow:inset -3px 0 0 var(--brand)}
+.rsz{position:absolute;top:0;right:-3px;width:9px;height:100%;cursor:col-resize;z-index:2;touch-action:none}
+.rsz::after{content:"";position:absolute;top:22%;bottom:22%;left:4px;width:2px;border-radius:1px;background:transparent}
+.grid th:hover .rsz::after,.rsz.on::after{background:var(--brand)}
+body.resizing,body.resizing *{cursor:col-resize!important;user-select:none!important}
+.fpmove{display:flex;gap:6px;margin-top:10px}
+.fpmove button{flex:1;border:1px solid var(--line);background:var(--paper);border-radius:6px;padding:6px 4px;cursor:pointer;font-weight:600;font-size:.82rem;color:var(--ink)}
+.fpmove button:disabled{opacity:.4;cursor:default}
+.fpreset{display:block;margin:8px auto 0;border:0;background:none;color:var(--focus);text-decoration:underline;cursor:pointer;font-size:.8rem}
 #fpop{position:fixed;z-index:30;width:min(290px,calc(100vw - 16px));background:var(--surface);border:1px solid var(--line);border-radius:8px;
   box-shadow:0 12px 32px rgba(20,10,25,.2);padding:10px 12px 12px;color:var(--ink)}
 .fph{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
@@ -763,7 +776,7 @@ function grow(el){el.style.height="auto";el.style.height=Math.max(36,el.scrollHe
 function delCell(i){return readOnly?"<td></td>":`<td class="dc">${i.kind==="look"?`<button class="ra" data-dup="1" title="Copy this row for another person on the same work">Copy</button>`:""}<button class="del" aria-label="Delete ${esc(i.ref)}" title="Delete row">×</button></td>`}
 function rowHtml(i){
   const isNew=!i, dis=readOnly?" disabled":"";
-  const tds=GRID[view].map(c=>{
+  const tds=colsFor(view).map(c=>{
     if(c.t==="ro")return isNew?`<td class="ro">${c.k==="ref"?"New":""}</td>`:`<td class="ro">${c.calc?c.calc(i):esc(i[c.k]||"")}</td>`;
     const v=isNew?(c.t==="pkg"?newPkg:""):(i[c.k]==null?"":String(i[c.k]));
     const a=`class="cell" data-k="${c.k}" aria-label="${esc(c.l)}"${dis}`;
@@ -794,10 +807,10 @@ function restoreFocus(f,root){
   el.focus({preventScroll:true});try{if(f.ss!=null)el.setSelectionRange(f.ss,f.se)}catch(e){}
 }
 function fullTable(list){
-  const box=$("tablebox"), fk=captureFocus(), cols=GRID[view];
-  const dw=view==="look"?88:40, w=cols.reduce((s,c)=>s+c.w+16,0)+dw;
-  box.innerHTML=`<table class="grid" style="width:${w}px"><colgroup>${cols.map(c=>`<col style="width:${c.w+16}px">`).join("")}<col style="width:${dw}px"></colgroup>
-    <thead><tr>${cols.map(c=>{const on=fActive((colFilters[view]||{})[c.k]);return `<th scope="col" title="${esc(c.l)}"><div class="thw"><span>${esc(c.l)}</span><button class="fbtn${on?" on":""}" data-fk="${c.k}" aria-label="Filter ${esc(c.l)}${on?" (filter on)":""}" title="Filter this column"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8.5V19l-4 2v-8.5z"/></svg></button></div></th>`}).join("")}<th aria-label="Delete row"></th></tr></thead>
+  const box=$("tablebox"), fk=captureFocus(), cols=colsFor(view);
+  const dw=view==="look"?88:40, w=cols.reduce((s,c)=>s+colW(view,c),0)+dw;
+  box.innerHTML=`<table class="grid" style="width:${w}px"><colgroup>${cols.map(c=>`<col data-col="${c.k}" style="width:${colW(view,c)}px">`).join("")}<col style="width:${dw}px"></colgroup>
+    <thead><tr>${cols.map(c=>{const on=fActive((colFilters[view]||{})[c.k]);return `<th scope="col" data-col="${c.k}" draggable="true" title="${esc(c.l)}: drag to move, drag the edge to resize"><span class="rsz" data-rsz="${c.k}" draggable="false" aria-hidden="true"></span><div class="thw"><span>${esc(c.l)}</span><button class="fbtn${on?" on":""}" data-fk="${c.k}" aria-label="Filter ${esc(c.l)}${on?" (filter on)":""}" title="Filter this column"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8.5V19l-4 2v-8.5z"/></svg></button></div></th>`}).join("")}<th aria-label="Delete row"></th></tr></thead>
     <tbody>${list.map(rowHtml).join("")}${readOnly?"":rowHtml(null)}</tbody></table>${readOnly&&!list.length?'<div class="empty">Nothing recorded here yet.</div>':""}`;
   rowSig=new Map(list.map(i=>[i.id,sig(i)]));
   box.querySelectorAll("textarea.cell").forEach(grow);
@@ -805,7 +818,7 @@ function fullTable(list){
 }
 function patchRow(tr,i){
   tr.classList.toggle("closed",isClosed(i));
-  GRID[i.kind].forEach((c,ci)=>{
+  colsFor(i.kind).forEach((c,ci)=>{
     const td=tr.children[ci];if(!td)return;
     if(c.t==="ro"){td.innerHTML=c.calc?c.calc(i):esc(i[c.k]||"");return}
     const el=td.querySelector(".cell"), v=i[c.k]==null?"":String(i[c.k]);
@@ -969,6 +982,68 @@ $("tlbox").addEventListener("click",e=>{
 });
 $("tlbox").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){const li=e.target.closest("[data-open]");if(li){e.preventDefault();openEventInTable(li.dataset.open)}}});
 
+/* ---------- column order and widths (saved on this device) ---------- */
+const COLKEY="pmt-cols";
+let colLayout={};try{colLayout=JSON.parse(localStorage.getItem(COLKEY)||"{}")||{}}catch(e){colLayout={}}
+function saveLayout(){try{localStorage.setItem(COLKEY,JSON.stringify(colLayout))}catch(e){}}
+function colsFor(v){
+  const base=GRID[v]||[], L=colLayout[v];if(!L||!L.order)return base;
+  const byK=new Map(base.map(c=>[c.k,c])), out=[];
+  L.order.forEach(k=>{if(byK.has(k)){out.push(byK.get(k));byK.delete(k)}});
+  base.forEach(c=>{if(byK.has(c.k))out.push(c)});
+  return out;
+}
+function colW(v,c){const L=colLayout[v];return (L&&L.w&&L.w[c.k])||c.w+16}
+function moveCol(v,k,toK,after){
+  const order=colsFor(v).map(c=>c.k).filter(x=>x!==k);
+  let at=toK==null?order.length:order.indexOf(toK)+(after?1:0);if(at<0)at=order.length;
+  order.splice(at,0,k);
+  (colLayout[v]=colLayout[v]||{}).order=order;saveLayout();tableKey="";syncTable();
+}
+function shiftCol(v,k,dir){
+  const order=colsFor(v).map(c=>c.k), i=order.indexOf(k), j=i+dir;if(j<0||j>=order.length)return;
+  [order[i],order[j]]=[order[j],order[i]];(colLayout[v]=colLayout[v]||{}).order=order;saveLayout();tableKey="";syncTable();
+}
+function resetLayout(v){delete colLayout[v];saveLayout();tableKey="";syncTable()}
+// drag a heading to move the column
+let dragK=null, resizing=false;
+$("tablebox").addEventListener("dragstart",e=>{
+  const th=e.target.closest&&e.target.closest("th[data-col]");
+  if(!th||resizing){e.preventDefault();return}
+  dragK=th.dataset.col;th.classList.add("dragging");closeFilter();
+  try{e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",dragK)}catch(x){}
+});
+$("tablebox").addEventListener("dragover",e=>{
+  if(!dragK)return;const th=e.target.closest("th[data-col]");
+  $("tablebox").querySelectorAll(".drop-l,.drop-r").forEach(x=>x.classList.remove("drop-l","drop-r"));
+  if(!th||th.dataset.col===dragK)return;
+  e.preventDefault();const r=th.getBoundingClientRect();th.classList.add(e.clientX>r.left+r.width/2?"drop-r":"drop-l");
+});
+$("tablebox").addEventListener("drop",e=>{
+  if(!dragK)return;e.preventDefault();const th=e.target.closest("th[data-col]");
+  if(th&&th.dataset.col!==dragK){const r=th.getBoundingClientRect();moveCol(view,dragK,th.dataset.col,e.clientX>r.left+r.width/2)}
+  dragK=null;
+});
+$("tablebox").addEventListener("dragend",()=>{dragK=null;$("tablebox").querySelectorAll(".dragging,.drop-l,.drop-r").forEach(x=>x.classList.remove("dragging","drop-l","drop-r"))});
+// drag a heading's right edge to resize; double-click the edge to restore the default width
+$("tablebox").addEventListener("pointerdown",e=>{
+  const h=e.target.closest(".rsz");if(!h)return;
+  e.preventDefault();e.stopPropagation();resizing=true;
+  const k=h.dataset.rsz, col=$("tablebox").querySelector(`col[data-col="${k}"]`), table=$("tablebox").querySelector("table");
+  const c=GRID[view].find(x=>x.k===k), startW=colW(view,c), startX=e.clientX, startT=parseFloat(table.style.width)||table.offsetWidth;
+  h.classList.add("on");document.body.classList.add("resizing");try{h.setPointerCapture(e.pointerId)}catch(x){}
+  let w=startW;
+  const move=ev=>{w=Math.max(60,Math.round(startW+ev.clientX-startX));col.style.width=w+"px";table.style.width=(startT+w-startW)+"px"};
+  const up=()=>{h.removeEventListener("pointermove",move);h.removeEventListener("pointerup",up);h.removeEventListener("pointercancel",up);
+    h.classList.remove("on");document.body.classList.remove("resizing");
+    const L=colLayout[view]=colLayout[view]||{};L.w=L.w||{};L.w[k]=w;saveLayout();setTimeout(()=>{resizing=false},0)};
+  h.addEventListener("pointermove",move);h.addEventListener("pointerup",up);h.addEventListener("pointercancel",up);
+});
+$("tablebox").addEventListener("dblclick",e=>{
+  const h=e.target.closest(".rsz");if(!h)return;const L=colLayout[view];
+  if(L&&L.w){delete L.w[h.dataset.rsz];saveLayout()}tableKey="";syncTable();
+});
+
 /* ---------- column filter pop-up ---------- */
 let fpop=null, fpopK=null;
 function closeFilter(){if(fpop){fpop.remove();fpop=null;fpopK=null}}
@@ -989,6 +1064,7 @@ function fillFilterList(){
   fpop.querySelector(".fpall input").checked=!F.vals;
   fpop.querySelector(".fplist").innerHTML=shown.length?shown.map(([v,e])=>`<label><input type="checkbox" data-v="${esc(v)}"${!F.vals||F.vals.includes(v)?" checked":""}><span>${v===""?"<i>(Blank)</i>":esc(v)}</span><em>${e.n}</em></label>`).join(""):'<div class="fpnone">No matching values</div>';
 }
+function updateMoveBtns(){if(!fpop)return;const o=colsFor(view).map(c=>c.k),i=o.indexOf(fpopK),bs=fpop.querySelectorAll("[data-mv]");if(bs.length===2){bs[0].disabled=i<=0;bs[1].disabled=i>=o.length-1}}
 function openFilter(k,btn){
   if(fpopK===k){closeFilter();return}
   closeFilter();
@@ -998,8 +1074,10 @@ function openFilter(k,btn){
   fpop.innerHTML=`<div class="fph"><b>Filter: ${esc(c.l)}</b><button class="fpx" aria-label="Close filter">×</button></div>
     <input type="search" class="fptext" placeholder="${c.t==="long"?"Show rows containing…":"Contains…"}" aria-label="Contains" value="${esc(F.text||"")}">
     ${c.t==="long"?"":`<label class="fpall"><input type="checkbox"> Select all</label><div class="fplist"></div>`}
-    <div class="fpf"><button class="btn" data-fclear>Clear filter</button><button class="btn primary" data-fdone>Done</button></div>`;
-  document.body.appendChild(fpop);fillFilterList();placeFilter(btn);
+    <div class="fpmove"><button data-mv="-1" title="Move this column left">◀ Move left</button><button data-mv="1" title="Move this column right">Move right ▶</button></div>
+    <div class="fpf"><button class="btn" data-fclear>Clear filter</button><button class="btn primary" data-fdone>Done</button></div>
+    <button class="fpreset" data-freset>Reset column order and widths</button>`;
+  document.body.appendChild(fpop);fillFilterList();placeFilter(btn);updateMoveBtns();
   fpop.querySelector(".fptext").focus();
   fpop.addEventListener("input",e=>{if(e.target.classList.contains("fptext")){setFilter(F2=>{F2.text=e.target.value.trim()});fillFilterList()}});
   fpop.addEventListener("change",e=>{
@@ -1016,6 +1094,10 @@ function openFilter(k,btn){
   });
   fpop.addEventListener("click",e=>{
     if(e.target.closest(".fpx")||e.target.closest("[data-fdone]")){closeFilter();return}
+    const mv=e.target.closest("[data-mv]");
+    if(mv){const k=fpopK;shiftCol(view,k,+mv.dataset.mv);const b=$("tablebox").querySelector(`.fbtn[data-fk="${k}"]`);
+      if(b){b.scrollIntoView({block:"nearest",inline:"nearest"});placeFilter(b)}updateMoveBtns();return}
+    if(e.target.closest("[data-freset]")){closeFilter();resetLayout(view);toast("Columns reset to the standard layout.");return}
     if(e.target.closest("[data-fclear]")){const f=colFilters[view];if(f)delete f[fpopK];closeFilter();render()}
   });
 }
@@ -1440,7 +1522,7 @@ async function exportCsv(){
     catch(e){if(e&&e.code&&e.code!=="declined"&&e.code!=="cancelled")toast("Export did not complete.")}
     return;
   }
-  const cols=GRID[view].filter(c=>c.k!=="_od"), list=filtered();
+  const cols=colsFor(view).filter(c=>c.k!=="_od"), list=filtered();
   const cell=v=>{v=v==null?"":String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
   const val=(i,c)=>c.k==="_slip"?(slip(i)==null?"":slip(i)):c.k==="_ast"?actStatus(i):i[c.k];
   const noOd=view!=="todo";
