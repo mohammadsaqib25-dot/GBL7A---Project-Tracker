@@ -244,6 +244,7 @@ td.dc{text-align:center}
 .lasel button.go{background:var(--brand);border-color:var(--brand);color:#fff}
 .selbox{width:16px;height:16px;margin:0 8px 0 0;vertical-align:-3px;accent-color:var(--brand);cursor:pointer}
 .grid tr.sel td{background:var(--secbg)}
+.grid tr.wkrow td{background:var(--secbg);font-weight:750;font-size:.86rem;padding:7px 10px;color:var(--ink);border-top:1px solid var(--line)}
 .namescell{vertical-align:top}
 .chips{display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:5px 6px;min-height:36px;cursor:text}
 .chips:focus-within{outline:2px solid var(--focus);outline-offset:-2px;background:var(--surface)}
@@ -467,9 +468,10 @@ const SCHEMA={
     {k:"impact",t:"select",o:["None","Programme","Cost","Programme and cost"]},
     {k:"related",t:"text"},{k:"who",t:"text"},{k:"notes",t:"area"}
   ]},
-  look:{tab:"2 Week Look Ahead",noun:"look-ahead entry",letter:"L",closed:"__never__",fields:[
-    {k:"pkg",t:"pkg"},{k:"from",t:"date"},{k:"to",t:"date"},{k:"area",t:"text"},{k:"name",t:"text"},
-    {k:"title",t:"text"},{k:"comments",t:"area"}
+  look:{tab:"2 Week Look Ahead",noun:"look-ahead row",letter:"L",closed:"__never__",fields:[
+    {k:"pkg",t:"pkg"},{k:"week",t:"date"},{k:"area",t:"text"},{k:"name",t:"text"},
+    {k:"d1",t:"area"},{k:"d2",t:"area"},{k:"d3",t:"area"},{k:"d4",t:"area"},{k:"d5",t:"area"},{k:"d6",t:"area"},{k:"d7",t:"area"},
+    {k:"comments",t:"area"}
   ]},
   todo:{tab:"To-do",noun:"task",letter:"T",closed:"Complete",fields:[
     {k:"pkg",t:"pkg"},{k:"title",t:"text"},{k:"owner",t:"text"},{k:"company",t:"text"},{k:"due",t:"date"},
@@ -482,6 +484,7 @@ const SCHEMA={
 const STATUS_MAP={todo:{"To do":"Not started","Doing":"In Progress","In progress":"In Progress","Done":"Complete"},action:{"In progress":"Open"}};
 function normItem(i){const m=STATUS_MAP[i.kind];if(m&&m[i.status])i.status=m[i.status];
   if(i.kind==="look"&&!Array.isArray(i.names)){i.names=splitNames(i.name);i.name=i.names.join(", ")}
+  if(i.kind==="look"&&!i.week)lookFromRange(i,i.from,i.to,i.title);
   if(i.kind==="action"&&i.status==="Closed"&&!i.closedOn){const d=i.updatedAt?new Date(i.updatedAt):new Date();i.closedOn=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
   return i}
 /* several names per look-ahead row */
@@ -567,7 +570,18 @@ const isClosed=i=>i.kind==="action"?!!i.closedOn:i.status===SCHEMA[i.kind].close
 const SLIP_DAYS=7;
 const addDays=(d,n)=>{const x=new Date(d+"T00:00:00");x.setDate(x.getDate()+n);return x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0")+"-"+String(x.getDate()).padStart(2,"0")};
 const mondayOf=d=>{const x=new Date(d+"T00:00:00"), wd=(x.getDay()+6)%7;return addDays(d,-wd)};
-let laStart=mondayOf(today()), laAll=false;
+let laStart=mondayOf(today()), laAll=false, laWeekend=false;
+try{laWeekend=localStorage.getItem("pmt-weekend")==="1"}catch(e){}
+const DAYK=["d1","d2","d3","d4","d5","d6","d7"], DAYN=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+// older look-ahead rows had a From/To date range and one description: spread it over the days of its week
+function lookFromRange(i,from,to,title){
+  const f=iso(from)||from||"", t=iso(to)||to||f;
+  i.week=f?mondayOf(f):mondayOf(today());
+  if(f&&title)DAYK.forEach((k,n)=>{const d=addDays(i.week,n);if(d>=f&&d<=t&&!i[k])i[k]=title});
+  return i;
+}
+const inWeek=(i,a)=>(i.week||"")===a;
+const weekLabel=w=>!w?"No week set":w===laStart?`Week 1: Mon ${dShort(w)} to Sun ${dShort(addDays(w,6))}`:w===addDays(laStart,7)?`Week 2: Mon ${dShort(w)} to Sun ${dShort(addDays(w,6))}`:`Week commencing ${dShort(w)}`;
 const laEnd=()=>addDays(laStart,13);
 const overlaps=(i,a,b)=>{const f=i.from||i.to, t=i.to||i.from;return !!f&&f<=b&&t>=a};
 function laWeeks(){return [{n:1,a:laStart,b:addDays(laStart,6)},{n:2,a:addDays(laStart,7),b:addDays(laStart,13)}]}
@@ -627,12 +641,17 @@ const GRID={
     {k:"who",l:"Who",t:"text",w:140},
     {k:"notes",l:"Details / outcome",t:"long",w:320}],
   look:[{k:"ref",l:"Ref",t:"ro",w:124},PKG,
-    {k:"from",l:"From",t:"date",w:136},
-    {k:"to",l:"To",t:"date",w:136},
-    {k:"area",l:"Area",t:"text",w:170},
-    {k:"name",l:"Names",t:"names",w:280},
-    {k:"title",l:"Description of work",t:"long",w:340},
-    {k:"comments",l:"Comments",t:"long",w:260}],
+    {k:"week",l:"Week commencing",t:"date",w:140},
+    {k:"area",l:"Area",t:"text",w:160},
+    {k:"name",l:"Names",t:"names",w:240},
+    {k:"d1",l:"Monday",t:"long",w:180},
+    {k:"d2",l:"Tuesday",t:"long",w:180},
+    {k:"d3",l:"Wednesday",t:"long",w:180},
+    {k:"d4",l:"Thursday",t:"long",w:180},
+    {k:"d5",l:"Friday",t:"long",w:180},
+    {k:"d6",l:"Saturday",t:"long",w:170},
+    {k:"d7",l:"Sunday",t:"long",w:170},
+    {k:"comments",l:"Comments",t:"long",w:220}],
   todo:[REF,PKG,
     {k:"title",l:"Task",t:"long",w:300},
     {k:"owner",l:"Owner",t:"text",w:140},
@@ -744,30 +763,30 @@ function renderFilterline(){
   if(q.trim())bits.push(`Matching "${esc(q.trim())}". <button data-clear="q">Clear search</button>`);
   const tips=[];
   if(view==="event"&&tlView()==="timeline")tips.push(all("event",pkgFilter).length?"Newest at the bottom. Click an event to edit it in the table.":"");
-  if(view==="look")tips.push(laAll?"Showing all dates.":`Showing work planned between ${dShort(laStart)} and ${dShort(laEnd())}. Add everyone working on the same job to one row: type a name and press Enter (or a comma) to add the next; click × to remove one. To roll work forward, tick lines (or Select Week 1) and press Copy to next week.`);
+  if(view==="look")tips.push(laAll?"Showing all weeks.":`Showing the weeks commencing ${dShort(laStart)} and ${dShort(addDays(laStart,7))}. Use one row per area or crew and type what they'll be doing in each day's column. Add names with Enter or a comma. To roll work forward, tick rows (or Select Week 1) and press Copy to next week.`);
   if(view==="action")tips.push(`Status is automatic: <b>On track</b> until the due date, <b>Slipping</b> up to ${SLIP_DAYS} days late, <b>Issue</b> after that, and <b>Closed</b> once a Date Closed is entered.`);
   if(!readOnly&&!(view==="event"&&tlView()==="timeline"))tips.push(`Click any cell to type; changes save as you go. Enter moves down, Shift+Enter starts a new line. Type in the last row to add ${aN(SCHEMA[view].noun)}.`);
   $("filterline").innerHTML=bits.join(" ")+(tips.join("")?`${bits.length?" ":""}<span class="tip">${tips.join(" ")}</span>`:"");
 }
 let laSel=new Set();
-function laStats(list,a,b){const L=list.filter(i=>overlaps(i,a,b));
+function laStats(list,a,b){const L=list.filter(i=>inWeek(i,a));
   return {lines:L.length,people:new Set(L.flatMap(i=>{const n=namesOf(i);return n.length?n.map(x=>x.toLowerCase()):["row:"+i.id]})).size,areas:new Set(L.map(i=>(i.area||"").trim().toLowerCase()).filter(Boolean)).size}}
 const selBox=i=>readOnly?"":`<input type="checkbox" class="selbox" data-sel="${i.id}"${laSel.has(i.id)?" checked":""} aria-label="Select ${esc(i.ref)}">`;
 const roHtml=(c,i)=>c.calc?c.calc(i):(c.k==="ref"&&i.kind==="look"?selBox(i):"")+esc(i[c.k]||"");
 async function copyLookNextWeek(){
   if(readOnly)return;
   const src=[...laSel].map(id=>items.get(id)).filter(Boolean);if(!src.length)return;
-  const key=i=>[i.pkg,(i.area||"").trim().toLowerCase(),(i.name||"").trim().toLowerCase(),(i.title||"").trim().toLowerCase(),i.from||"",i.to||""].join("|");
+  const key=i=>[i.pkg,(i.area||"").trim().toLowerCase(),(i.name||"").trim().toLowerCase(),i.week||""].concat(DAYK.map(k=>(i[k]||"").trim().toLowerCase())).join("|");
   const have=new Set();items.forEach(i=>{if(i.kind==="look")have.add(key(i))});
   const made=[];let skipped=0,t=Date.now();
-  src.sort((a,b)=>(a.from||"").localeCompare(b.from||"")||(a.createdAt||0)-(b.createdAt||0)).forEach(s=>{
+  src.sort((a,b)=>(a.week||"").localeCompare(b.week||"")||(a.createdAt||0)-(b.createdAt||0)).forEach(s=>{
     const it={...s,id:newId(),createdAt:t++,updatedAt:Date.now()};
-    if(it.from)it.from=addDays(it.from,7);if(it.to)it.to=addDays(it.to,7);
+    it.week=addDays(it.week||laStart,7);
     if(have.has(key(it))){skipped++;return}
     it.ref=nextRef("look",it.pkg,it.id);items.set(it.id,it);have.add(key(it));made.push(it)});
   laSel.clear();tableKey="";render();
   if(mode==="db"){for(const it of made){try{await db.collection("items").doc(it.id).set(it)}catch(e){failed(e);return}}}else saveLocal();
-  const outside=made.some(i=>!laAll&&(i.from||i.to)&&!overlaps(i,laStart,laEnd()));
+  const outside=made.some(i=>!laAll&&!inWeek(i,laStart)&&!inWeek(i,addDays(laStart,7)));
   toast(made.length?`${made.length} line item${made.length===1?"":"s"} copied to the next week${skipped?`, ${skipped} already there`:""}.${outside?" Use Week ▶ to see them.":""}`:"Those lines are already in the next week.");
 }
 function renderLaHead(){
@@ -779,7 +798,8 @@ function renderLaHead(){
   const n=[...laSel].filter(id=>items.has(id)).length;
   el.innerHTML=`<div class="lactl"><label>Look-ahead from <input type="date" id="laStart" value="${laStart}"></label>
     <div class="nav"><button data-lanav="-7" title="Previous week">◀ Week</button><button data-lanav="0">This week</button><button data-lanav="7" title="Next week">Week ▶</button></div>
-    <label><input type="checkbox" id="laAll"${laAll?" checked":""}> Show all dates</label>
+    <label><input type="checkbox" id="laAll"${laAll?" checked":""}> Show all weeks</label>
+    <label><input type="checkbox" id="laWE"${laWeekend?" checked":""}> Show Saturday and Sunday</label>
     ${readOnly?"":`<div class="lasel"><span>Select</span><button data-lapick="1" title="Tick every line in Week 1">Week 1</button><button data-lapick="2" title="Tick every line in Week 2">Week 2</button>${n?`<button class="go" data-lacopy title="Copy the ticked lines with their dates moved on 7 days">Copy ${n} to next week</button><button data-laclear>Clear</button>`:""}</div>`}</div>${wk}`;
 }
 function renderChrome(){renderLanes();renderTabs();renderSync();renderName();renderLogo();renderLaHead()}
@@ -812,9 +832,9 @@ function filtered(skipCol){
   let list=all(view,pkgFilter);
   if(hideClosed)list=list.filter(i=>!isClosed(i));
   if(GRID[view])list=list.filter(i=>passCols(i,skipCol));
-  if(s)list=list.filter(i=>[i.ref,i.title,i.owner,i.responsible,i.notes,i.mitigation,i.comments,i.cause,i.source,i.type,i.related,i.who,i.company,i.area,i.name,i.role,i.kind==="action"?actStatus(i):""].some(v=>v&&String(v).toLowerCase().includes(s)));
-  if(view==="look"){if(!laAll)list=list.filter(i=>!(i.from||i.to)||overlaps(i,laStart,laEnd()));
-    return list.sort((a,b)=>(a.from||a.to||"9999").localeCompare(b.from||b.to||"9999")||String(a.area||"").localeCompare(String(b.area||""))||(a.createdAt||0)-(b.createdAt||0))}
+  if(s)list=list.filter(i=>[i.ref,i.title,i.owner,i.responsible,i.notes,i.mitigation,i.comments,i.cause,i.source,i.type,i.related,i.who,i.company,i.area,i.name,i.role,i.d1,i.d2,i.d3,i.d4,i.d5,i.d6,i.d7,i.kind==="action"?actStatus(i):""].some(v=>v&&String(v).toLowerCase().includes(s)));
+  if(view==="look"){if(!laAll)list=list.filter(i=>!i.week||inWeek(i,laStart)||inWeek(i,addDays(laStart,7)));
+    return list.sort((a,b)=>(a.week||"9999").localeCompare(b.week||"9999")||String(a.area||"").localeCompare(String(b.area||""))||(a.createdAt||0)-(b.createdAt||0))}
   if(view==="event")return list.sort((a,b)=>(a.date||"9999").localeCompare(b.date||"9999")||(a.createdAt||0)-(b.createdAt||0));
   return list.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)||String(a.ref).localeCompare(String(b.ref)));
 }
@@ -858,7 +878,7 @@ function fullTable(list){
   const dw=view==="look"?88:40, w=cols.reduce((s,c)=>s+colW(view,c),0)+dw;
   box.innerHTML=`<table class="grid" style="width:${w}px"><colgroup>${cols.map(c=>`<col data-col="${c.k}" style="width:${colW(view,c)}px">`).join("")}<col style="width:${dw}px"></colgroup>
     <thead><tr>${cols.map(c=>{const on=fActive((colFilters[view]||{})[c.k]);return `<th scope="col" data-col="${c.k}" draggable="true" title="${esc(c.l)}: drag to move, drag the edge to resize"><span class="rsz" data-rsz="${c.k}" draggable="false" aria-hidden="true"></span><div class="thw"><span>${esc(c.l)}</span><button class="fbtn${on?" on":""}" data-fk="${c.k}" aria-label="Filter ${esc(c.l)}${on?" (filter on)":""}" title="Filter this column"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8.5V19l-4 2v-8.5z"/></svg></button></div></th>`}).join("")}<th aria-label="Delete row"></th></tr></thead>
-    <tbody>${list.map(rowHtml).join("")}${readOnly?"":rowHtml(null)}</tbody></table>${readOnly&&!list.length?'<div class="empty">Nothing recorded here yet.</div>':""}`;
+    <tbody>${view==="look"?(()=>{let last=null,h="";list.forEach(i=>{const w=i.week||"";if(w!==last){last=w;h+=`<tr class="wkrow"><td colspan="${cols.length+1}">${esc(weekLabel(w))}</td></tr>`}h+=rowHtml(i)});return h})():list.map(rowHtml).join("")}${readOnly?"":rowHtml(null)}</tbody></table>${readOnly&&!list.length?'<div class="empty">Nothing recorded here yet.</div>':""}`;
   rowSig=new Map(list.map(i=>[i.id,sig(i)]));
   box.querySelectorAll("textarea.cell").forEach(grow);
   restoreFocus(fk);
@@ -982,9 +1002,9 @@ function syncTable(){
   if(view==="event"&&tlView()==="timeline"){$("tablebox").hidden=true;$("tlbox").hidden=false;renderTimeline();return}
   $("tlbox").hidden=true;
   $("tablebox").hidden=false;$("progbox").hidden=true;progRendered.sig=null;
-  const list=filtered(), key=[view,pkgFilter,q,hideClosed,readOnly,view==="look"?laStart+laAll:"",JSON.stringify(colFilters[view]||{})].join("|");
+  const list=filtered(), key=[view,pkgFilter,q,hideClosed,readOnly,view==="look"?laStart+laAll+laWeekend:"",JSON.stringify(colFilters[view]||{})].join("|");
   const tb=$("tablebox").querySelector("tbody");
-  const dom=tb?[...tb.children].map(t=>t.dataset.id).filter(x=>x!=="new").join(","):null;
+  const dom=tb?[...tb.children].map(t=>t.dataset.id).filter(x=>x&&x!=="new").join(","):null;
   const ids=list.map(i=>i.id), same=(view==="event"||view==="look")&&dom!=null?dom.split(",").filter(Boolean).sort().join(",")===ids.slice().sort().join(","):dom===ids.join(",");
   if(!tb||key!==tableKey||!same){tableKey=key;fullTable(list);return}
   list.forEach(i=>{if(rowSig.get(i.id)!==sig(i)){const tr=tb.querySelector(`tr[data-id="${i.id}"]`);if(tr)patchRow(tr,i)}});
@@ -1020,10 +1040,11 @@ function openEventInTable(id){
 $("lahead").addEventListener("change",e=>{
   if(e.target.id==="laStart"&&e.target.value){laStart=mondayOf(e.target.value);render()}
   if(e.target.id==="laAll"){laAll=e.target.checked;render()}
+  if(e.target.id==="laWE"){laWeekend=e.target.checked;try{localStorage.setItem("pmt-weekend",laWeekend?"1":"0")}catch(x){}tableKey="";render()}
 });
 $("lahead").addEventListener("click",e=>{
   const pick=e.target.closest("[data-lapick]");
-  if(pick){const w=laWeeks()[+pick.dataset.lapick-1];filtered().forEach(i=>{if(overlaps(i,w.a,w.b))laSel.add(i.id)});tableKey="";render();return}
+  if(pick){const w=laWeeks()[+pick.dataset.lapick-1];filtered().forEach(i=>{if(inWeek(i,w.a))laSel.add(i.id)});tableKey="";render();return}
   if(e.target.closest("[data-laclear]")){laSel.clear();tableKey="";render();return}
   if(e.target.closest("[data-lacopy]")){copyLookNextWeek();return}
   const b=e.target.closest("[data-lanav]");if(!b)return;
@@ -1040,11 +1061,11 @@ const COLKEY="pmt-cols";
 let colLayout={};try{colLayout=JSON.parse(localStorage.getItem(COLKEY)||"{}")||{}}catch(e){colLayout={}}
 function saveLayout(){try{localStorage.setItem(COLKEY,JSON.stringify(colLayout))}catch(e){}}
 function colsFor(v){
-  const base=GRID[v]||[], L=colLayout[v];if(!L||!L.order)return base;
-  const byK=new Map(base.map(c=>[c.k,c])), out=[];
-  L.order.forEach(k=>{if(byK.has(k)){out.push(byK.get(k));byK.delete(k)}});
-  base.forEach(c=>{if(byK.has(c.k))out.push(c)});
-  return out;
+  const base=GRID[v]||[], L=colLayout[v];let out=base;
+  if(L&&L.order){const byK=new Map(base.map(c=>[c.k,c]));out=[];
+    L.order.forEach(k=>{if(byK.has(k)){out.push(byK.get(k));byK.delete(k)}});
+    base.forEach(c=>{if(byK.has(c.k))out.push(c)})}
+  return v==="look"&&!laWeekend?out.filter(c=>c.k!=="d6"&&c.k!=="d7"):out;
 }
 function colW(v,c){const L=colLayout[v];return (L&&L.w&&L.w[c.k])||c.w+16}
 function moveCol(v,k,toK,after){
@@ -1180,9 +1201,10 @@ function commit(el){
     if(view==="delay"){it.identified=today();it.eot="To be assessed"}
     if(view==="action")it.raised=today();
     if(view==="event"&&k!=="date")it.date=today();
-    if(view==="look"){if(k!=="from")it.from=laStart;if(k!=="to")it.to=addDays(laStart,4)}
+    if(view==="look"&&k!=="week")it.week=laStart;
     it[k]=val;it.ref=nextRef(view,it.pkg,it.id);
     if(el.classList.contains("chipin")){withNames(it,[val]);el.value=""}
+    if(view==="look"&&k==="week"&&val){it.week=mondayOf(val);el.value=it.week}
     tr.dataset.id=it.id;tr.classList.remove("newrow");
     const t=tr.querySelector('.cell[data-k="title"]');if(t)t.removeAttribute("placeholder");
     const st=tr.querySelector('select[data-k="status"]');if(st&&st.options[0]&&st.options[0].value==="")st.remove(0);
@@ -1196,11 +1218,13 @@ function commit(el){
   if(el.classList.contains("chipin")){if(!val)return;const it=withNames({...old},namesOf(old).concat(splitNames(val)));el.value="";putItem(it,true);patchRow(tr,it);return}
   if((old[k]==null?"":String(old[k]))===val)return;
   const it={...old};it[k]=val;
+  if(it.kind==="look"&&k==="week"&&val){it.week=mondayOf(val);el.value=it.week}
   if(k==="pkg")it.ref=nextRef(it.kind,val,it.id);
   if(k==="status"){if(isClosed(it)&&!it.closedOn)it.closedOn=today();if(!isClosed(it))delete it.closedOn}
   putItem(it,true);patchRow(tr,it);
 }
-function moveTo(tr,k){
+function moveTo(tr,k,up){
+  while(tr&&tr.classList&&tr.classList.contains("wkrow"))tr=up?tr.previousElementSibling:tr.nextElementSibling;
   if(!tr)return;const el=tr.querySelector(`.cell[data-k="${k}"]`);if(!el)return;
   el.focus();if(el.type==="text"||el.tagName==="TEXTAREA"){const n=el.value.length;try{el.setSelectionRange(n,n)}catch(e){}}
 }
@@ -1223,7 +1247,7 @@ box.addEventListener("keydown",e=>{
   }
   if(e.key==="Enter"&&!e.shiftKey&&el.tagName!=="SELECT"){e.preventDefault();commit(el);moveTo(tr.nextElementSibling,k);return}
   if(el.type==="text"&&(e.key==="ArrowDown"||e.key==="ArrowUp")){
-    e.preventDefault();commit(el);moveTo(e.key==="ArrowDown"?tr.nextElementSibling:tr.previousElementSibling,k);
+    e.preventDefault();commit(el);moveTo(e.key==="ArrowDown"?tr.nextElementSibling:tr.previousElementSibling,k,e.key==="ArrowUp");
   }
 });
 box.addEventListener("click",e=>{
@@ -1397,16 +1421,16 @@ const LIST_PDF={
       return [["Events recorded",L.length],["With programme or cost impact",L.filter(i=>i.impact&&i.impact!=="None").length],["Period covered",d.length?dShort(d[0])+" to "+dShort(d[d.length-1]):"–"]]},
     group:i=>{const mk=i.date?i.date.slice(0,7):"none";return {key:mk,label:mk==="none"?"No date":new Date(mk+"-01T00:00:00").toLocaleDateString("en-GB",{month:"long",year:"numeric"})}}},
   look:{title:"2 Week Look Ahead",
-    cols:[["Ref",17],["Pkg",13],["From",16],["To",16],["Area",36],["Names",38],["Description of work",92],["Comments",49]],
-    row:i=>[i.ref,pkgShort(i.pkg),dShort(i.from),dShort(i.to),i.area,namesOf(i).join("\n"),i.title,i.comments],
+    cols:L=>{lookPdfWE=laWeekend||L.some(i=>i.d6||i.d7);const days=(lookPdfWE?DAYN:DAYN.slice(0,5)).map(d=>[d,lookPdfWE?24:32]);
+      return [["Ref",15],["Pkg",11],["Area",lookPdfWE?24:27],["Names",lookPdfWE?28:31]].concat(days,[["Comments",lookPdfWE?31:33]])},
+    row:i=>[i.ref,pkgShort(i.pkg),i.area,namesOf(i).join("\n")].concat((lookPdfWE?DAYK:DAYK.slice(0,5)).map(k=>i[k]||""),[i.comments]),
     tone:()=>null,
     summary:L=>{const out=[];laWeeks().forEach(w=>{const st=laStats(L,w.a,w.b);
-        out.push([`Week ${w.n} (${dShort(w.a)} to ${dShort(addDays(w.a,4))})`,st.lines?`${st.people} ${st.people===1?"person":"people"}  |  ${st.areas} ${st.areas===1?"area":"areas"}  |  ${st.lines} line item${st.lines===1?"":"s"}`:"Nothing planned"])});
+        out.push([`Week ${w.n} (Mon ${dShort(w.a)} to Sun ${dShort(addDays(w.a,6))})`,st.lines?`${st.people} ${st.people===1?"person":"people"}  |  ${st.areas} ${st.areas===1?"area":"areas"}  |  ${st.lines} row${st.lines===1?"":"s"}`:"Nothing planned"])});
       return out},
-    group:i=>{const f=i.from||i.to;if(!f)return {key:"none",label:"No dates set"};
-      const w=laWeeks().find(w=>overlaps(i,w.a,w.b));
-      return w?{key:"w"+w.n,label:`Week ${w.n}: ${dShort(w.a)} to ${dShort(addDays(w.a,6))}`}:{key:"o"+mondayOf(f),label:"Week commencing "+dShort(mondayOf(f))}}}
+    group:i=>({key:"w"+(i.week||""),label:weekLabel(i.week)})}
 };
+let lookPdfWE=false;
 async function buildListPdf(kind,list,filterText){
   const {jsPDF}=window.jspdf, cfg=LIST_PDF[kind];
   const doc=new jsPDF({unit:"mm",format:"a4",orientation:"landscape",compress:true});
@@ -1433,7 +1457,7 @@ async function buildListPdf(kind,list,filterText){
   sm.forEach(([lab,val],k)=>{const x=M+k*(cw+3);rect(x,y,cw,ch,LAV);rect(x,y,1.2,ch,PUR);
     F(7,false,MUT);T(lab,x+4,y+2);F(String(val).length>18?9:11,true,INK);T(String(val),x+4,y+5.6)});
   y+=ch+5;
-  const cols=cfg.cols, scale=CW/cols.reduce((a,c)=>a+c[1],0), widths=cols.map(c=>c[1]*scale);
+  const cols=typeof cfg.cols==="function"?cfg.cols(list):cfg.cols, scale=CW/cols.reduce((a,c)=>a+c[1],0), widths=cols.map(c=>c[1]*scale);
   const headRow=()=>{const h=lh+2*pad+0.6;let x=M;cols.forEach((c,k)=>{rect(x,y,widths[k],h,GOLD,true);F(fs,true,INK);
       if(c[2]==="r")T(c[0],x+widths[k]-px,y+pad+0.3,{align:"right"});else T(c[0],x+px,y+pad+0.3);x+=widths[k]});y+=h};
   const newPage=()=>{doc.addPage();y=M;const bh=8;rect(M,y,CW,bh,PUR);rect(M,y+bh,CW,0.8,GOLD);
@@ -1604,11 +1628,12 @@ const XL={
   delay:{sheet:"Delay Log",map:{"Ref":"ref","Package":"pkg","Delay description":"title","Cause":"cause","Impact":"impact","Date identified":"identified","Responsible party":"responsible","Planned date":"original","Forecast date":"revised","Status":"status","EOT claim":"eot","Mitigation / recovery plan":"mitigation","Date closed":"closedOn","Comments":"comments"}},
   action:{sheet:"Action Tracker",map:{"Action No.":"ref","Package":"pkg","Description":"title","Raised in":"source","Date Raised":"raised","Act Owner":"owner","Due Date":"due","Date Closed":"closedOn","Status":"status","Comments/Response":"notes"},
     alias:{"Ref":"ref","Action":"title","Owner":"owner","Raised at":"source","Date raised":"raised","Due date":"due","Update / comments":"notes","Date closed":"closedOn"}},
-  look:{sheet:"Look Ahead",map:{"Ref":"ref","Package":"pkg","From":"from","To":"to","Area":"area","Names":"name","Description of work":"title","Comments":"comments"},alias:{"Name":"name"}},
+  look:{sheet:"Look Ahead",map:{"Ref":"ref","Package":"pkg","Week commencing":"week","Area":"area","Names":"name","Monday":"d1","Tuesday":"d2","Wednesday":"d3","Thursday":"d4","Friday":"d5","Saturday":"d6","Sunday":"d7","Comments":"comments"},
+    alias:{"Name":"name","From":"from","To":"to","Description of work":"title"}},
   event:{sheet:"Timeline",map:{"Ref":"ref","Package":"pkg","Date":"date","Type":"type","Event":"title","Impact":"impact","Related ref":"related","Who":"who","Details / outcome":"notes"}},
   todo:{sheet:"To-Do List",map:{"Ref":"ref","Package":"pkg","Task":"title","Owner":"owner","Company":"company","Due date":"due","Priority":"priority","Status":"status","Notes":"notes"},alias:{"Who":"owner"}}
 };
-const DATEK=new Set(["identified","original","revised","closedOn","raised","due","date","from","to"]);
+const DATEK=new Set(["identified","original","revised","closedOn","raised","due","date","from","to","week"]);
 const p2=n=>String(n).padStart(2,"0");
 function iso(v){
   if(typeof v==="number"&&v>20000){const d=new Date(Math.round((v-25569)*864e5));return d.getUTCFullYear()+"-"+p2(d.getUTCMonth()+1)+"-"+p2(d.getUTCDate())}
@@ -1687,7 +1712,7 @@ async function importXlsx(file){
   let added=0,updated=0,n=0;const out=[];const base=Date.now();
   for(const kind of Object.keys(XL)){
     const ws=wbk.Sheets[XL[kind].sheet];if(!ws)continue;
-    const map=Object.assign({},XL[kind].alias||{},XL[kind].map), titleHeads=Object.keys(map).filter(h=>map[h]==="title");
+    const map=Object.assign({},XL[kind].alias||{},XL[kind].map), titleHeads=Object.keys(map).filter(h=>map[h]==="title"||(kind==="look"&&(map[h]==="area"||map[h]==="name")));
     const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:""});
     const hi=rows.findIndex(r=>r.map(x=>String(x).trim()).some(h=>titleHeads.includes(h)));if(hi<0)continue;
     const head=rows[hi].map(x=>String(x).trim());
@@ -1695,12 +1720,12 @@ async function importXlsx(file){
       const o={};head.forEach((h,c)=>{if(map[h])o[map[h]]=r[c]});
       const title=String(o.title==null?"":o.title).trim(), pkg=String(o.pkg||"").trim().toUpperCase();
       let pk=pkg;if(kind==="event"&&/^(ALL|PRJ|PROJECT|ALL PACKAGES)$/.test(pk))pk="ALL";
-      if((!title&&!(kind==="look"&&String(o.name||"").trim()))||!(PKGS.some(p=>p.id===pk)||(kind==="event"&&pk==="ALL")))continue;
+      if((!title&&!(kind==="look"&&[o.name,o.area].concat(DAYK.map(k=>o[k])).some(v=>String(v==null?"":v).trim())))||!(PKGS.some(p=>p.id===pk)||(kind==="event"&&pk==="ALL")))continue;
       const S=SCHEMA[kind], fref=String(o.ref||"").trim();
       const ex=fref&&byRef.get(kind+"|"+fref);
       const it=ex?{...ex}:{id:newId(),kind,createdAt:base+(n++)};
       S.fields.forEach(f=>{if(f.t==="pkg")return;const v=o[f.k];it[f.k]=DATEK.has(f.k)?iso(v):String(v==null?"":v).trim()});
-      if(kind==="look")withNames(it,[it.name||""]);
+      if(kind==="look"){withNames(it,[it.name||""]);if(it.week)it.week=mondayOf(it.week);else lookFromRange(it,iso(o.from),iso(o.to),String(o.title||"").trim())}
       normItem(it);const sf=S.fields.find(f=>f.k==="status");if(sf&&!sf.o.includes(it.status))it.status=sf.o[0];
       it.pkg=pk;
       it.ref=ex?ex.ref:(fref||nextRef(kind,pk,it.id));
