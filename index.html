@@ -244,6 +244,14 @@ td.dc{text-align:center}
 .lasel button.go{background:var(--brand);border-color:var(--brand);color:#fff}
 .selbox{width:16px;height:16px;margin:0 8px 0 0;vertical-align:-3px;accent-color:var(--brand);cursor:pointer}
 .grid tr.sel td{background:var(--secbg)}
+.namescell{vertical-align:top}
+.chips{display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:5px 6px;min-height:36px;cursor:text}
+.chips:focus-within{outline:2px solid var(--focus);outline-offset:-2px;background:var(--surface)}
+.chip{display:inline-flex;align-items:center;background:var(--secbg);color:var(--ink);border-radius:999px;padding:2px 3px 2px 10px;font-size:.84rem;font-weight:600;white-space:nowrap;line-height:1.4}
+.chipx{border:0;background:none;color:var(--muted);cursor:pointer;font-size:1rem;line-height:1;padding:0 5px;border-radius:50%}
+.chipx:hover{color:var(--late)}
+.cell.chipin{flex:1 1 90px;min-width:90px;width:auto;padding:3px 2px;min-height:0;display:inline-block;font-size:.88rem}
+.cell.chipin:focus{outline:none;background:transparent}
 .lawk{flex:1 1 260px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:6px;padding:9px 14px}
 .lawk h4{margin:0;font-size:.95rem;font-stretch:80%;font-weight:800;color:var(--accent)}
 .lawk h4 span{font-weight:500;color:var(--muted);font-stretch:100%;font-size:.8rem;margin-left:6px}
@@ -473,8 +481,19 @@ const SCHEMA={
 (()=>{for(const k of ["event","look"]){const e=SCHEMA[k];delete SCHEMA[k];SCHEMA[k]=e}})();
 const STATUS_MAP={todo:{"To do":"Not started","Doing":"In Progress","In progress":"In Progress","Done":"Complete"},action:{"In progress":"Open"}};
 function normItem(i){const m=STATUS_MAP[i.kind];if(m&&m[i.status])i.status=m[i.status];
+  if(i.kind==="look"&&!Array.isArray(i.names)){i.names=splitNames(i.name);i.name=i.names.join(", ")}
   if(i.kind==="action"&&i.status==="Closed"&&!i.closedOn){const d=i.updatedAt?new Date(i.updatedAt):new Date();i.closedOn=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
   return i}
+/* several names per look-ahead row */
+function splitNames(s){const out=[];String(s||"").split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean).forEach(n=>{if(!out.some(o=>o.toLowerCase()===n.toLowerCase()))out.push(n)});return out}
+function namesOf(i){return Array.isArray(i.names)?i.names:splitNames(i.name)}
+function withNames(it,list){it.names=splitNames(list.join(","));it.name=it.names.join(", ");return it}
+const chipHtml=n=>`<span class="chip">${esc(n)}${readOnly?"":`<button class="chipx" data-rmname="${esc(n)}" aria-label="Remove ${esc(n)}" title="Remove">×</button>`}</span>`;
+function namesCell(i){const ns=i?namesOf(i):[];
+  return `<td class="namescell"><div class="chips">${ns.map(chipHtml).join("")}${readOnly?"":`<input type="text" class="cell chipin" data-k="name" aria-label="Add a name" placeholder="${ns.length?"+ name":"Type a name, press Enter"}">`}</div></td>`}
+function renderChips(td,i){const box=td.querySelector(".chips");if(!box)return;box.querySelectorAll(".chip").forEach(x=>x.remove());
+  const inp=box.querySelector(".chipin"), html=namesOf(i).map(chipHtml).join("");
+  if(inp){inp.insertAdjacentHTML("beforebegin",html);inp.placeholder=namesOf(i).length?"+ name":"Type a name, press Enter"}else box.innerHTML=html}
 const opt=(kind,k)=>{const f=SCHEMA[kind].fields.find(f=>f.k===k);return (f&&f.o)||[]};
 const LS="pm-tracker-fsa-myd-ml-v1";
 
@@ -611,7 +630,7 @@ const GRID={
     {k:"from",l:"From",t:"date",w:136},
     {k:"to",l:"To",t:"date",w:136},
     {k:"area",l:"Area",t:"text",w:170},
-    {k:"name",l:"Name",t:"text",w:170},
+    {k:"name",l:"Names",t:"names",w:280},
     {k:"title",l:"Description of work",t:"long",w:340},
     {k:"comments",l:"Comments",t:"long",w:260}],
   todo:[REF,PKG,
@@ -725,14 +744,14 @@ function renderFilterline(){
   if(q.trim())bits.push(`Matching "${esc(q.trim())}". <button data-clear="q">Clear search</button>`);
   const tips=[];
   if(view==="event"&&tlView()==="timeline")tips.push(all("event",pkgFilter).length?"Newest at the bottom. Click an event to edit it in the table.":"");
-  if(view==="look")tips.push(laAll?"Showing all dates.":`Showing work planned between ${dShort(laStart)} and ${dShort(laEnd())}. Use one row per person; Copy on a row adds another person to the same work. To roll work forward, tick lines (or Select Week 1) and press Copy to next week.`);
+  if(view==="look")tips.push(laAll?"Showing all dates.":`Showing work planned between ${dShort(laStart)} and ${dShort(laEnd())}. Add everyone working on the same job to one row: type a name and press Enter (or a comma) to add the next; click × to remove one. To roll work forward, tick lines (or Select Week 1) and press Copy to next week.`);
   if(view==="action")tips.push(`Status is automatic: <b>On track</b> until the due date, <b>Slipping</b> up to ${SLIP_DAYS} days late, <b>Issue</b> after that, and <b>Closed</b> once a Date Closed is entered.`);
   if(!readOnly&&!(view==="event"&&tlView()==="timeline"))tips.push(`Click any cell to type; changes save as you go. Enter moves down, Shift+Enter starts a new line. Type in the last row to add ${aN(SCHEMA[view].noun)}.`);
   $("filterline").innerHTML=bits.join(" ")+(tips.join("")?`${bits.length?" ":""}<span class="tip">${tips.join(" ")}</span>`:"");
 }
 let laSel=new Set();
 function laStats(list,a,b){const L=list.filter(i=>overlaps(i,a,b));
-  return {lines:L.length,people:new Set(L.map(i=>(i.name||"").trim().toLowerCase()||"row:"+i.id)).size,areas:new Set(L.map(i=>(i.area||"").trim().toLowerCase()).filter(Boolean)).size}}
+  return {lines:L.length,people:new Set(L.flatMap(i=>{const n=namesOf(i);return n.length?n.map(x=>x.toLowerCase()):["row:"+i.id]})).size,areas:new Set(L.map(i=>(i.area||"").trim().toLowerCase()).filter(Boolean)).size}}
 const selBox=i=>readOnly?"":`<input type="checkbox" class="selbox" data-sel="${i.id}"${laSel.has(i.id)?" checked":""} aria-label="Select ${esc(i.ref)}">`;
 const roHtml=(c,i)=>c.calc?c.calc(i):(c.k==="ref"&&i.kind==="look"?selBox(i):"")+esc(i[c.k]||"");
 async function copyLookNextWeek(){
@@ -774,15 +793,17 @@ function colText(i,c){
   if(c.k==="_ast")return actStatus(i);
   if(c.k==="_od")return overdue(i)?"Overdue":"Not overdue";
   if(c.k==="pkg")return i.pkg==="ALL"?"All":String(i.pkg||"");
+  if(c.t==="names")return namesOf(i).join(", ");
   if(c.t==="date")return i[c.k]?dShort(i[c.k]):"";
   return String(i[c.k]==null?"":i[c.k]).trim();
 }
 const fActive=F=>F&&(F.vals||F.text);
 function activeCols(){const f=colFilters[view]||{};return (GRID[view]||[]).filter(c=>fActive(f[c.k]))}
+const colVals=(i,c)=>{if(c.t==="names"){const n=namesOf(i);return n.length?n:[""]}return [colText(i,c)]};
 function passCols(i,skip){
   const f=colFilters[view];if(!f||!GRID[view])return true;
   for(const c of GRID[view]){if(c.k===skip)continue;const F=f[c.k];if(!fActive(F))continue;const v=colText(i,c);
-    if(F.vals&&!F.vals.includes(v))return false;
+    if(F.vals&&!colVals(i,c).some(x=>F.vals.includes(x)))return false;
     if(F.text&&!v.toLowerCase().includes(F.text.toLowerCase()))return false}
   return true;
 }
@@ -803,6 +824,7 @@ function rowHtml(i){
   const isNew=!i, dis=readOnly?" disabled":"";
   const tds=colsFor(view).map(c=>{
     if(c.t==="ro")return isNew?`<td class="ro">${c.k==="ref"?"New":""}</td>`:`<td class="ro">${roHtml(c,i)}</td>`;
+    if(c.t==="names")return namesCell(i);
     const v=isNew?(c.t==="pkg"?newPkg:""):(i[c.k]==null?"":String(i[c.k]));
     const a=`class="cell" data-k="${c.k}" aria-label="${esc(c.l)}"${dis}`;
     let inner,cls="",dv="";
@@ -846,6 +868,7 @@ function patchRow(tr,i){
   colsFor(i.kind).forEach((c,ci)=>{
     const td=tr.children[ci];if(!td)return;
     if(c.t==="ro"){td.innerHTML=roHtml(c,i);return}
+    if(c.t==="names"){renderChips(td,i);return}
     const el=td.querySelector(".cell"), v=i[c.k]==null?"":String(i[c.k]);
     if(el&&el!==document.activeElement&&el.value!==v){el.value=v;if(el.tagName==="TEXTAREA")grow(el)}
     if(c.t==="pkg")td.className="pk "+v;
@@ -1085,7 +1108,7 @@ function placeFilter(btn){
 function fillFilterList(){
   if(!fpop)return;const c=GRID[view].find(x=>x.k===fpopK);if(!c||c.t==="long")return;
   const F=(colFilters[view]||{})[fpopK]||{};
-  const m=new Map();filtered(fpopK).forEach(i=>{const v=colText(i,c);const e=m.get(v)||{n:0,key:c.t==="date"?(i[c.k]||""):c.k==="_slip"?(slip(i)??-1e9):v};e.n++;m.set(v,e)});
+  const m=new Map();filtered(fpopK).forEach(i=>colVals(i,c).forEach(v=>{const e=m.get(v)||{n:0,key:c.t==="date"?(i[c.k]||""):c.k==="_slip"?(slip(i)??-1e9):v};e.n++;m.set(v,e)}));
   (F.vals||[]).forEach(v=>{if(!m.has(v))m.set(v,{n:0,key:v})});
   const vals=[...m.entries()].sort((a,b)=>{if(a[0]===""&&b[0]!=="")return 1;if(b[0]===""&&a[0]!=="")return -1;
     const x=a[1].key,y=b[1].key;return typeof x==="number"&&typeof y==="number"?x-y:String(x).localeCompare(String(y),undefined,{numeric:true})});
@@ -1115,9 +1138,9 @@ function openFilter(k,btn){
     if(t.closest(".fpall")){setFilter(F2=>{F2.vals=t.checked?null:[]});fillFilterList();return}
     const boxes=[...fpop.querySelectorAll(".fplist input[data-v]")];
     setFilter(F2=>{
-      const cur=new Set(F2.vals||[...(function(){const m=new Set();filtered(fpopK).forEach(i=>m.add(colText(i,c)));return m})()]);
+      const cur=new Set(F2.vals||[...(function(){const m=new Set();filtered(fpopK).forEach(i=>colVals(i,c).forEach(v=>m.add(v)));return m})()]);
       boxes.forEach(b=>{if(b.checked)cur.add(b.dataset.v);else cur.delete(b.dataset.v)});
-      const allVals=new Set();filtered(fpopK).forEach(i=>allVals.add(colText(i,c)));
+      const allVals=new Set();filtered(fpopK).forEach(i=>colVals(i,c).forEach(v=>allVals.add(v)));
       F2.vals=[...allVals].every(v=>cur.has(v))?null:[...cur];
     });
     fpop.querySelector(".fpall input").checked=!((colFilters[view]||{})[fpopK]||{}).vals;
@@ -1159,6 +1182,7 @@ function commit(el){
     if(view==="event"&&k!=="date")it.date=today();
     if(view==="look"){if(k!=="from")it.from=laStart;if(k!=="to")it.to=addDays(laStart,4)}
     it[k]=val;it.ref=nextRef(view,it.pkg,it.id);
+    if(el.classList.contains("chipin")){withNames(it,[val]);el.value=""}
     tr.dataset.id=it.id;tr.classList.remove("newrow");
     const t=tr.querySelector('.cell[data-k="title"]');if(t)t.removeAttribute("placeholder");
     const st=tr.querySelector('select[data-k="status"]');if(st&&st.options[0]&&st.options[0].value==="")st.remove(0);
@@ -1169,6 +1193,7 @@ function commit(el){
     return;
   }
   const old=items.get(id);if(!old)return;
+  if(el.classList.contains("chipin")){if(!val)return;const it=withNames({...old},namesOf(old).concat(splitNames(val)));el.value="";putItem(it,true);patchRow(tr,it);return}
   if((old[k]==null?"":String(old[k]))===val)return;
   const it={...old};it[k]=val;
   if(k==="pkg")it.ref=nextRef(it.kind,val,it.id);
@@ -1187,6 +1212,11 @@ box.addEventListener("change",e=>{const s=e.target.closest&&e.target.closest(".s
 box.addEventListener("keydown",e=>{
   const el=e.target;if(!el.classList||!el.classList.contains("cell"))return;
   const tr=el.closest("tr"),k=el.dataset.k;
+  if(el.classList.contains("chipin")){
+    if(e.key==="Enter"||e.key===","||e.key===";"){e.preventDefault();commit(el);return}
+    if(e.key==="Backspace"&&!el.value){const it0=items.get(tr.dataset.id);if(it0&&namesOf(it0).length){const it=withNames({...it0},namesOf(it0).slice(0,-1));putItem(it,true);patchRow(tr,it)}return}
+    if(e.key==="Escape"){el.value="";el.blur();return}
+  }
   if(e.key==="Escape"){
     const it=items.get(tr.dataset.id);el.value=it?(it[k]==null?"":it[k]):(k==="pkg"?newPkg:"");
     if(el.tagName==="TEXTAREA")grow(el);el.blur();return;
@@ -1197,12 +1227,16 @@ box.addEventListener("keydown",e=>{
   }
 });
 box.addEventListener("click",e=>{
+  const rm=e.target.closest("[data-rmname]");
+  if(rm&&!readOnly){const tr=rm.closest("tr"),it0=items.get(tr.dataset.id);if(!it0)return;
+    const it=withNames({...it0},namesOf(it0).filter(n=>n!==rm.dataset.rmname));putItem(it,true);patchRow(tr,it);return}
+  const chipsBox=e.target.closest(".chips");if(chipsBox&&!e.target.closest(".chipx")){const inp=chipsBox.querySelector(".chipin");if(inp&&e.target!==inp)inp.focus()}
   const dup=e.target.closest("[data-dup]");
   if(dup&&!readOnly){const src=items.get(dup.closest("tr").dataset.id);if(!src)return;
-    const it={...src,id:newId(),createdAt:Date.now(),name:"",comments:""};it.ref=nextRef("look",it.pkg,it.id);
+    const it={...src,id:newId(),createdAt:Date.now(),name:"",names:[],comments:""};it.ref=nextRef("look",it.pkg,it.id);
     putItem(it);const tr=$("tablebox").querySelector(`tr[data-id="${it.id}"]`);
     if(tr){tr.scrollIntoView({block:"nearest"});const n=tr.querySelector('.cell[data-k="name"]');if(n)n.focus()}
-    toast(`${it.ref} added. Type the next person's name.`);return}
+    toast(`${it.ref} added. Type the names for this row.`);return}
   const b=e.target.closest(".del");if(!b)return;
   const it=items.get(b.closest("tr").dataset.id);if(!it)return;
   if(confirm(`Delete ${it.ref}${it.title?": "+it.title.slice(0,60):""}? This cannot be undone.`)){removeItem(it.id);toast(`${it.ref} deleted.`)}
@@ -1363,8 +1397,8 @@ const LIST_PDF={
       return [["Events recorded",L.length],["With programme or cost impact",L.filter(i=>i.impact&&i.impact!=="None").length],["Period covered",d.length?dShort(d[0])+" to "+dShort(d[d.length-1]):"–"]]},
     group:i=>{const mk=i.date?i.date.slice(0,7):"none";return {key:mk,label:mk==="none"?"No date":new Date(mk+"-01T00:00:00").toLocaleDateString("en-GB",{month:"long",year:"numeric"})}}},
   look:{title:"2 Week Look Ahead",
-    cols:[["Ref",17],["Pkg",13],["From",16],["To",16],["Area",36],["Name",38],["Description of work",92],["Comments",49]],
-    row:i=>[i.ref,pkgShort(i.pkg),dShort(i.from),dShort(i.to),i.area,i.name,i.title,i.comments],
+    cols:[["Ref",17],["Pkg",13],["From",16],["To",16],["Area",36],["Names",38],["Description of work",92],["Comments",49]],
+    row:i=>[i.ref,pkgShort(i.pkg),dShort(i.from),dShort(i.to),i.area,namesOf(i).join("\n"),i.title,i.comments],
     tone:()=>null,
     summary:L=>{const out=[];laWeeks().forEach(w=>{const st=laStats(L,w.a,w.b);
         out.push([`Week ${w.n} (${dShort(w.a)} to ${dShort(addDays(w.a,4))})`,st.lines?`${st.people} ${st.people===1?"person":"people"}  |  ${st.areas} ${st.areas===1?"area":"areas"}  |  ${st.lines} line item${st.lines===1?"":"s"}`:"Nothing planned"])});
@@ -1570,7 +1604,7 @@ const XL={
   delay:{sheet:"Delay Log",map:{"Ref":"ref","Package":"pkg","Delay description":"title","Cause":"cause","Impact":"impact","Date identified":"identified","Responsible party":"responsible","Planned date":"original","Forecast date":"revised","Status":"status","EOT claim":"eot","Mitigation / recovery plan":"mitigation","Date closed":"closedOn","Comments":"comments"}},
   action:{sheet:"Action Tracker",map:{"Action No.":"ref","Package":"pkg","Description":"title","Raised in":"source","Date Raised":"raised","Act Owner":"owner","Due Date":"due","Date Closed":"closedOn","Status":"status","Comments/Response":"notes"},
     alias:{"Ref":"ref","Action":"title","Owner":"owner","Raised at":"source","Date raised":"raised","Due date":"due","Update / comments":"notes","Date closed":"closedOn"}},
-  look:{sheet:"Look Ahead",map:{"Ref":"ref","Package":"pkg","From":"from","To":"to","Area":"area","Name":"name","Description of work":"title","Comments":"comments"}},
+  look:{sheet:"Look Ahead",map:{"Ref":"ref","Package":"pkg","From":"from","To":"to","Area":"area","Names":"name","Description of work":"title","Comments":"comments"},alias:{"Name":"name"}},
   event:{sheet:"Timeline",map:{"Ref":"ref","Package":"pkg","Date":"date","Type":"type","Event":"title","Impact":"impact","Related ref":"related","Who":"who","Details / outcome":"notes"}},
   todo:{sheet:"To-Do List",map:{"Ref":"ref","Package":"pkg","Task":"title","Owner":"owner","Company":"company","Due date":"due","Priority":"priority","Status":"status","Notes":"notes"},alias:{"Who":"owner"}}
 };
@@ -1661,11 +1695,12 @@ async function importXlsx(file){
       const o={};head.forEach((h,c)=>{if(map[h])o[map[h]]=r[c]});
       const title=String(o.title==null?"":o.title).trim(), pkg=String(o.pkg||"").trim().toUpperCase();
       let pk=pkg;if(kind==="event"&&/^(ALL|PRJ|PROJECT|ALL PACKAGES)$/.test(pk))pk="ALL";
-      if(!title||!(PKGS.some(p=>p.id===pk)||(kind==="event"&&pk==="ALL")))continue;
+      if((!title&&!(kind==="look"&&String(o.name||"").trim()))||!(PKGS.some(p=>p.id===pk)||(kind==="event"&&pk==="ALL")))continue;
       const S=SCHEMA[kind], fref=String(o.ref||"").trim();
       const ex=fref&&byRef.get(kind+"|"+fref);
       const it=ex?{...ex}:{id:newId(),kind,createdAt:base+(n++)};
       S.fields.forEach(f=>{if(f.t==="pkg")return;const v=o[f.k];it[f.k]=DATEK.has(f.k)?iso(v):String(v==null?"":v).trim()});
+      if(kind==="look")withNames(it,[it.name||""]);
       normItem(it);const sf=S.fields.find(f=>f.k==="status");if(sf&&!sf.o.includes(it.status))it.status=sf.o[0];
       it.pkg=pk;
       it.ref=ex?ex.ref:(fref||nextRef(kind,pk,it.id));
