@@ -245,6 +245,12 @@ td.dc{text-align:center}
 .selbox{width:16px;height:16px;margin:0 8px 0 0;vertical-align:-3px;accent-color:var(--brand);cursor:pointer}
 .grid tr.sel td{background:var(--secbg)}
 .grid tr.wkrow td{background:var(--secbg);font-weight:750;font-size:.86rem;padding:7px 10px;color:var(--ink);border-top:1px solid var(--line)}
+.grid tr.wkhead td{background:var(--brand);color:#fff;font-size:.9rem;padding:8px 12px}
+.grid tr.dayrow td{background:var(--secbg);padding:6px 10px}
+.dname{font-weight:800;color:var(--accent)}
+.dcount{margin-left:12px;font-weight:500;color:var(--muted);font-size:.8rem}
+.dsel{margin-left:12px;border:1px solid var(--line);background:var(--surface);border-radius:5px;padding:2px 8px;font-size:.76rem;font-weight:650;cursor:pointer;color:var(--ink)}
+#lahead .lapk{flex:1 0 100%}
 .namescell{vertical-align:top}
 .chips{display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:5px 6px;min-height:36px;cursor:text}
 .chips:focus-within{outline:2px solid var(--focus);outline-offset:-2px;background:var(--surface)}
@@ -468,9 +474,8 @@ const SCHEMA={
     {k:"impact",t:"select",o:["None","Programme","Cost","Programme and cost"]},
     {k:"related",t:"text"},{k:"who",t:"text"},{k:"notes",t:"area"}
   ]},
-  look:{tab:"2 Week Look Ahead",noun:"look-ahead row",letter:"L",closed:"__never__",fields:[
-    {k:"pkg",t:"pkg"},{k:"week",t:"date"},{k:"area",t:"text"},{k:"name",t:"text"},
-    {k:"d1",t:"area"},{k:"d2",t:"area"},{k:"d3",t:"area"},{k:"d4",t:"area"},{k:"d5",t:"area"},{k:"d6",t:"area"},{k:"d7",t:"area"},
+  look:{tab:"2 Week Look Ahead",noun:"entry",letter:"L",closed:"__never__",fields:[
+    {k:"pkg",t:"pkg"},{k:"date",t:"date"},{k:"area",t:"text"},{k:"name",t:"text"},{k:"title",t:"area"},
     {k:"comments",t:"area"}
   ]},
   todo:{tab:"To-do",noun:"task",letter:"T",closed:"Complete",fields:[
@@ -484,7 +489,7 @@ const SCHEMA={
 const STATUS_MAP={todo:{"To do":"Not started","Doing":"In Progress","In progress":"In Progress","Done":"Complete"},action:{"In progress":"Open"}};
 function normItem(i){const m=STATUS_MAP[i.kind];if(m&&m[i.status])i.status=m[i.status];
   if(i.kind==="look"&&!Array.isArray(i.names)){i.names=splitNames(i.name);i.name=i.names.join(", ")}
-  if(i.kind==="look"&&!i.week)lookFromRange(i,i.from,i.to,i.title);
+  if(i.kind==="look"&&!i.week&&!i.date)lookFromRange(i,i.from,i.to,i.title);
   if(i.kind==="action"&&i.status==="Closed"&&!i.closedOn){const d=i.updatedAt?new Date(i.updatedAt):new Date();i.closedOn=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
   return i}
 /* several names per look-ahead row */
@@ -580,7 +585,28 @@ function lookFromRange(i,from,to,title){
   if(f&&title)DAYK.forEach((k,n)=>{const d=addDays(i.week,n);if(d>=f&&d<=t&&!i[k])i[k]=title});
   return i;
 }
-const inWeek=(i,a)=>(i.week||"")===a;
+const inWeek=(i,a)=>!!i.date&&i.date>=a&&i.date<=addDays(a,6);
+let lookPkg="FSA";
+const DAYLONG=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+const dayIdx=d=>(new Date(d+"T00:00:00").getDay()+6)%7;
+function splitLook(leg){
+  const out=[], base={kind:"look",pkg:leg.pkg,area:leg.area||"",names:namesOf(leg),comments:leg.comments||""};base.name=base.names.join(", ");
+  const wk=leg.week||mondayOf(today());let any=false;
+  DAYK.forEach((k,n)=>{const t=String(leg[k]||"").trim();if(!t)return;any=true;
+    out.push({...base,id:leg.id+"-"+(n+1),date:addDays(wk,n),title:t,createdAt:(leg.createdAt||0)+n/10})});
+  if(!any)out.push({...base,id:leg.id+"-1",date:wk,title:leg.title||"",createdAt:leg.createdAt||0});
+  return out;
+}
+// convert older look-ahead rows (a week per row, or a From/To range) into one row per day
+function migrateLookItems(persist){
+  const legacy=[...items.values()].filter(i=>i.kind==="look"&&!i.date);if(!legacy.length)return;
+  const made=[];
+  legacy.forEach(old=>{splitLook(old).forEach(pt=>{if(!items.has(pt.id)){pt.ref=nextRef("look",pt.pkg,pt.id);items.set(pt.id,pt);made.push(pt)}});items.delete(old.id)});
+  if(!persist){saveLocal();return}
+  if(readOnly||!db)return;
+  (async()=>{for(const it of made){try{await db.collection("items").doc(it.id).set(it)}catch(e){return}}
+    for(const o of legacy){try{await db.collection("items").doc(o.id).delete()}catch(e){}}})();
+}
 const weekLabel=w=>!w?"No week set":w===laStart?`Week 1: Mon ${dShort(w)} to Sun ${dShort(addDays(w,6))}`:w===addDays(laStart,7)?`Week 2: Mon ${dShort(w)} to Sun ${dShort(addDays(w,6))}`:`Week commencing ${dShort(w)}`;
 const laEnd=()=>addDays(laStart,13);
 const overlaps=(i,a,b)=>{const f=i.from||i.to, t=i.to||i.from;return !!f&&f<=b&&t>=a};
@@ -640,18 +666,12 @@ const GRID={
     {k:"related",l:"Related ref",t:"text",w:130},
     {k:"who",l:"Who",t:"text",w:140},
     {k:"notes",l:"Details / outcome",t:"long",w:320}],
-  look:[{k:"ref",l:"Ref",t:"ro",w:124},PKG,
-    {k:"week",l:"Week commencing",t:"date",w:140},
-    {k:"area",l:"Area",t:"text",w:160},
-    {k:"name",l:"Names",t:"names",w:240},
-    {k:"d1",l:"Monday",t:"long",w:180},
-    {k:"d2",l:"Tuesday",t:"long",w:180},
-    {k:"d3",l:"Wednesday",t:"long",w:180},
-    {k:"d4",l:"Thursday",t:"long",w:180},
-    {k:"d5",l:"Friday",t:"long",w:180},
-    {k:"d6",l:"Saturday",t:"long",w:170},
-    {k:"d7",l:"Sunday",t:"long",w:170},
-    {k:"comments",l:"Comments",t:"long",w:220}],
+  look:[{k:"_sel",l:"",t:"ro",w:30,calc:i=>selBox(i)},
+    {k:"date",l:"Date",t:"date",w:140},
+    {k:"area",l:"Area",t:"text",w:200},
+    {k:"name",l:"Names",t:"names",w:320},
+    {k:"title",l:"Task / work",t:"long",w:380},
+    {k:"comments",l:"Comments",t:"long",w:280}],
   todo:[REF,PKG,
     {k:"title",l:"Task",t:"long",w:300},
     {k:"owner",l:"Owner",t:"text",w:140},
@@ -664,7 +684,7 @@ const GRID={
 };
 
 /* ---------- storage ---------- */
-function loadLocal(){try{const r=JSON.parse(localStorage.getItem(LS)||"null");if(r){(r.items||[]).forEach(i=>items.set(i.id,normItem(i)));if(r.name)projectName=r.name;if(r.logo)projectLogo=r.logo;if(r.progress)progress=r.progress}}catch(e){}}
+function loadLocal(){try{const r=JSON.parse(localStorage.getItem(LS)||"null");if(r){(r.items||[]).forEach(i=>items.set(i.id,normItem(i)));migrateLookItems(false);if(r.name)projectName=r.name;if(r.logo)projectLogo=r.logo;if(r.progress)progress=r.progress}}catch(e){}}
 function saveLocal(){try{localStorage.setItem(LS,JSON.stringify({items:[...items.values()],name:projectName,logo:projectLogo,progress}))}catch(e){}}
 function failed(e){
   const c=e&&e.code;
@@ -758,14 +778,14 @@ function renderSync(){
 function renderFilterline(){
   if(view==="progress"){const P=getProg(progPkg);$("filterline").innerHTML=readOnly||!P?"":'<span class="tip">'+(isPm(P)?"Enter % complete against Material and Labour under each item. Type in the shaded row at the end of a section to add a line item.":"Enter quantities in the Done to date column. Type in the shaded row at the end of a section to add a line item.")+'</span>';return}
   const bits=[];
-  if(pkgFilter!=="ALL")bits.push(`Showing ${pkgFilter} only. <button data-clear="pkg">Show all packages</button>`);
+  if(pkgFilter!=="ALL"&&view!=="look")bits.push(`Showing ${pkgFilter} only. <button data-clear="pkg">Show all packages</button>`);
   {const ac=activeCols();if(ac.length&&view!=="progress")bits.push(`Filtered by ${ac.map(c=>esc(c.l)).join(", ")}. <button data-clear="cols">Clear column filters</button>`)}
   if(q.trim())bits.push(`Matching "${esc(q.trim())}". <button data-clear="q">Clear search</button>`);
   const tips=[];
   if(view==="event"&&tlView()==="timeline")tips.push(all("event",pkgFilter).length?"Newest at the bottom. Click an event to edit it in the table.":"");
-  if(view==="look")tips.push(laAll?"Showing all weeks.":`Showing the weeks commencing ${dShort(laStart)} and ${dShort(addDays(laStart,7))}. Use one row per area or crew and type what they'll be doing in each day's column. Add names with Enter or a comma. To roll work forward, tick rows (or Select Week 1) and press Copy to next week.`);
+  if(view==="look")tips.push(`${esc(pkgLabel(lookPkg))}: every day has its own heading. Type in the shaded row under a day to add an entry with its area, names and work; add names with Enter or a comma. To roll a week forward, tick entries (or Tick Week 1) and press Copy to next week.`);
   if(view==="action")tips.push(`Status is automatic: <b>On track</b> until the due date, <b>Slipping</b> up to ${SLIP_DAYS} days late, <b>Issue</b> after that, and <b>Closed</b> once a Date Closed is entered.`);
-  if(!readOnly&&!(view==="event"&&tlView()==="timeline"))tips.push(`Click any cell to type; changes save as you go. Enter moves down, Shift+Enter starts a new line. Type in the last row to add ${aN(SCHEMA[view].noun)}.`);
+  if(!readOnly&&view!=="look"&&!(view==="event"&&tlView()==="timeline"))tips.push(`Click any cell to type; changes save as you go. Enter moves down, Shift+Enter starts a new line. Type in the last row to add ${aN(SCHEMA[view].noun)}.`);
   $("filterline").innerHTML=bits.join(" ")+(tips.join("")?`${bits.length?" ":""}<span class="tip">${tips.join(" ")}</span>`:"");
 }
 let laSel=new Set();
@@ -776,31 +796,31 @@ const roHtml=(c,i)=>c.calc?c.calc(i):(c.k==="ref"&&i.kind==="look"?selBox(i):"")
 async function copyLookNextWeek(){
   if(readOnly)return;
   const src=[...laSel].map(id=>items.get(id)).filter(Boolean);if(!src.length)return;
-  const key=i=>[i.pkg,(i.area||"").trim().toLowerCase(),(i.name||"").trim().toLowerCase(),i.week||""].concat(DAYK.map(k=>(i[k]||"").trim().toLowerCase())).join("|");
+  const key=i=>[i.pkg,(i.area||"").trim().toLowerCase(),(i.name||"").trim().toLowerCase(),(i.title||"").trim().toLowerCase(),i.date||""].join("|");
   const have=new Set();items.forEach(i=>{if(i.kind==="look")have.add(key(i))});
   const made=[];let skipped=0,t=Date.now();
-  src.sort((a,b)=>(a.week||"").localeCompare(b.week||"")||(a.createdAt||0)-(b.createdAt||0)).forEach(s=>{
+  src.sort((a,b)=>(a.date||"").localeCompare(b.date||"")||(a.createdAt||0)-(b.createdAt||0)).forEach(s=>{
     const it={...s,id:newId(),createdAt:t++,updatedAt:Date.now()};
-    it.week=addDays(it.week||laStart,7);
+    it.date=addDays(it.date||laStart,7);
     if(have.has(key(it))){skipped++;return}
     it.ref=nextRef("look",it.pkg,it.id);items.set(it.id,it);have.add(key(it));made.push(it)});
   laSel.clear();tableKey="";render();
   if(mode==="db"){for(const it of made){try{await db.collection("items").doc(it.id).set(it)}catch(e){failed(e);return}}}else saveLocal();
-  const outside=made.some(i=>!laAll&&!inWeek(i,laStart)&&!inWeek(i,addDays(laStart,7)));
+  const outside=made.some(i=>i.date>addDays(laStart,13));
   toast(made.length?`${made.length} line item${made.length===1?"":"s"} copied to the next week${skipped?`, ${skipped} already there`:""}.${outside?" Use Week ▶ to see them.":""}`:"Those lines are already in the next week.");
 }
 function renderLaHead(){
   const el=$("lahead");if(view!=="look"){el.hidden=true;return}
   el.hidden=false;
-  const list=all("look",pkgFilter);
+  const list=all("look",lookPkg);
   const wk=laWeeks().map(w=>{const st=laStats(list,w.a,w.b);
-    return `<div class="lawk"><h4>Week ${w.n}<span>${dShort(w.a)} to ${dShort(addDays(w.a,4))}</span></h4><div class="cnt">${st.lines?`<span><b>${st.people}</b> ${st.people===1?"person":"people"}</span><span><b>${st.areas}</b> ${st.areas===1?"area":"areas"}</span><span class="tot">${st.lines} line item${st.lines===1?"":"s"}</span>`:'<span style="color:var(--muted)">Nothing planned yet</span>'}</div></div>`}).join("");
+    return `<div class="lawk"><h4>Week ${w.n}<span>${dShort(w.a)} to ${dShort(addDays(w.a,laWeekend?6:4))}</span></h4><div class="cnt">${st.lines?`<span><b>${st.people}</b> ${st.people===1?"person":"people"}</span><span><b>${st.areas}</b> ${st.areas===1?"area":"areas"}</span><span class="tot">${st.lines} ${st.lines===1?"entry":"entries"}</span>`:'<span style="color:var(--muted)">Nothing planned yet</span>'}</div></div>`}).join("");
   const n=[...laSel].filter(id=>items.has(id)).length;
-  el.innerHTML=`<div class="lactl"><label>Look-ahead from <input type="date" id="laStart" value="${laStart}"></label>
+  el.innerHTML=`<div class="lapk pkpills" role="tablist" aria-label="Package">${PKGS.map(p=>`<button class="pp ${p.id}" role="tab" data-lapkg="${p.id}" aria-pressed="${p.id===lookPkg}" aria-selected="${p.id===lookPkg}">${esc(p.label||p.id)}</button>`).join("")}</div>
+    <div class="lactl"><label>Look-ahead from <input type="date" id="laStart" value="${laStart}"></label>
     <div class="nav"><button data-lanav="-7" title="Previous week">◀ Week</button><button data-lanav="0">This week</button><button data-lanav="7" title="Next week">Week ▶</button></div>
-    <label><input type="checkbox" id="laAll"${laAll?" checked":""}> Show all weeks</label>
     <label><input type="checkbox" id="laWE"${laWeekend?" checked":""}> Show Saturday and Sunday</label>
-    ${readOnly?"":`<div class="lasel"><span>Select</span><button data-lapick="1" title="Tick every line in Week 1">Week 1</button><button data-lapick="2" title="Tick every line in Week 2">Week 2</button>${n?`<button class="go" data-lacopy title="Copy the ticked lines with their dates moved on 7 days">Copy ${n} to next week</button><button data-laclear>Clear</button>`:""}</div>`}</div>${wk}`;
+    ${readOnly?"":`<div class="lasel"><span>Tick</span><button data-lapick="1" title="Tick every entry in Week 1">Week 1</button><button data-lapick="2" title="Tick every entry in Week 2">Week 2</button>${n?`<button class="go" data-lacopy title="Copy the ticked entries 7 days later">Copy ${n} to next week</button><button data-laclear>Clear</button>`:""}</div>`}</div>${wk}`;
 }
 function renderChrome(){renderLanes();renderTabs();renderSync();renderName();renderLogo();renderLaHead()}
 function render(){renderChrome();renderFilterline();syncTable()}
@@ -829,23 +849,38 @@ function passCols(i,skip){
 }
 function filtered(skipCol){
   const s=q.trim().toLowerCase();
-  let list=all(view,pkgFilter);
+  let list=all(view,view==="look"?lookPkg:pkgFilter);
   if(hideClosed)list=list.filter(i=>!isClosed(i));
   if(GRID[view])list=list.filter(i=>passCols(i,skipCol));
   if(s)list=list.filter(i=>[i.ref,i.title,i.owner,i.responsible,i.notes,i.mitigation,i.comments,i.cause,i.source,i.type,i.related,i.who,i.company,i.area,i.name,i.role,i.d1,i.d2,i.d3,i.d4,i.d5,i.d6,i.d7,i.kind==="action"?actStatus(i):""].some(v=>v&&String(v).toLowerCase().includes(s)));
-  if(view==="look"){if(!laAll)list=list.filter(i=>!i.week||inWeek(i,laStart)||inWeek(i,addDays(laStart,7)));
-    return list.sort((a,b)=>(a.week||"9999").localeCompare(b.week||"9999")||String(a.area||"").localeCompare(String(b.area||""))||(a.createdAt||0)-(b.createdAt||0))}
+  if(view==="look"){const a=laStart,b=addDays(laStart,13);list=list.filter(i=>i.date&&i.date>=a&&i.date<=b);
+    return list.sort((x,y)=>(x.date||"").localeCompare(y.date||"")||String(x.area||"").localeCompare(String(y.area||""))||(x.createdAt||0)-(y.createdAt||0))}
   if(view==="event")return list.sort((a,b)=>(a.date||"9999").localeCompare(b.date||"9999")||(a.createdAt||0)-(b.createdAt||0));
   return list.sort((a,b)=>(a.createdAt||0)-(b.createdAt||0)||String(a.ref).localeCompare(String(b.ref)));
 }
 function grow(el){el.style.height="auto";el.style.height=Math.max(36,el.scrollHeight)+"px"}
 function delCell(i){return readOnly?"<td></td>":`<td class="dc">${i.kind==="look"?`<button class="ra" data-dup="1" title="Copy this row for another person on the same work">Copy</button>`:""}<button class="del" aria-label="Delete ${esc(i.ref)}" title="Delete row">×</button></td>`}
-function rowHtml(i){
+function lookBody(list,span){
+  let h="";
+  laWeeks().forEach(w=>{
+    h+=`<tr class="wkrow wkhead"><td colspan="${span}">Week ${w.n}: Mon ${dShort(w.a)} to Sun ${dShort(addDays(w.a,6))}</td></tr>`;
+    for(let n=0;n<7;n++){
+      const d=addDays(w.a,n), rows=list.filter(i=>i.date===d);
+      if(n>=5&&!laWeekend&&!rows.length)continue;
+      const allSel=rows.length&&rows.every(i=>laSel.has(i.id));
+      h+=`<tr class="wkrow dayrow" data-day="${d}"><td colspan="${span}"><span class="dname">${DAYLONG[n]} ${dShort(d)}</span><span class="dcount">${rows.length?rows.length+(rows.length===1?" entry":" entries"):"Nothing planned"}</span>${rows.length&&!readOnly?`<button class="dsel" data-laday="${d}">${allSel?"Untick day":"Tick day"}</button>`:""}</td></tr>`;
+      rows.forEach(i=>{h+=rowHtml(i)});
+      if(!readOnly)h+=rowHtml(null,d);
+    }
+  });
+  return h;
+}
+function rowHtml(i,newDate){
   const isNew=!i, dis=readOnly?" disabled":"";
   const tds=colsFor(view).map(c=>{
     if(c.t==="ro")return isNew?`<td class="ro">${c.k==="ref"?"New":""}</td>`:`<td class="ro">${roHtml(c,i)}</td>`;
     if(c.t==="names")return namesCell(i);
-    const v=isNew?(c.t==="pkg"?newPkg:""):(i[c.k]==null?"":String(i[c.k]));
+    const v=isNew?(c.t==="pkg"?newPkg:(c.k==="date"&&newDate?newDate:"")):(i[c.k]==null?"":String(i[c.k]));
     const a=`class="cell" data-k="${c.k}" aria-label="${esc(c.l)}"${dis}`;
     let inner,cls="",dv="";
     if(c.t==="pkg"){cls="pk "+v;inner=`<select ${a}>${(view==="event"?PKGS.concat([{id:"ALL"}]):PKGS).map(p=>`<option value="${p.id}"${p.id===v?" selected":""}>${p.id==="ALL"?"All":p.id}</option>`).join("")}</select>`}
@@ -858,7 +893,7 @@ function rowHtml(i){
     else inner=`<textarea rows="1" ${a}${isNew&&c.k==="title"?` placeholder="Type here to add ${aN(SCHEMA[view].noun)}"`:""}>${esc(v)}</textarea>`;
     return `<td${cls?` class="${cls}"`:""}${dv}>${inner}</td>`;
   }).join("");
-  return `<tr data-id="${isNew?"new":i.id}" class="${isNew?"newrow":(isClosed(i)?"closed":"")+(laSel.has(i.id)?" sel":"")}">${tds}${isNew?"<td></td>":delCell(i)}</tr>`;
+  return `<tr data-id="${isNew?"new":i.id}"${isNew&&newDate?` data-date="${newDate}"`:""} class="${isNew?"newrow":(isClosed(i)?"closed":"")+(laSel.has(i.id)?" sel":"")}">${tds}${isNew?"<td></td>":delCell(i)}</tr>`;
 }
 function captureFocus(root){
   root=root||$("tablebox");const a=document.activeElement;
@@ -877,8 +912,8 @@ function fullTable(list){
   const box=$("tablebox"), fk=captureFocus(), cols=colsFor(view);
   const dw=view==="look"?88:40, w=cols.reduce((s,c)=>s+colW(view,c),0)+dw;
   box.innerHTML=`<table class="grid" style="width:${w}px"><colgroup>${cols.map(c=>`<col data-col="${c.k}" style="width:${colW(view,c)}px">`).join("")}<col style="width:${dw}px"></colgroup>
-    <thead><tr>${cols.map(c=>{const on=fActive((colFilters[view]||{})[c.k]);return `<th scope="col" data-col="${c.k}" draggable="true" title="${esc(c.l)}: drag to move, drag the edge to resize"><span class="rsz" data-rsz="${c.k}" draggable="false" aria-hidden="true"></span><div class="thw"><span>${esc(c.l)}</span><button class="fbtn${on?" on":""}" data-fk="${c.k}" aria-label="Filter ${esc(c.l)}${on?" (filter on)":""}" title="Filter this column"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8.5V19l-4 2v-8.5z"/></svg></button></div></th>`}).join("")}<th aria-label="Delete row"></th></tr></thead>
-    <tbody>${view==="look"?(()=>{let last=null,h="";list.forEach(i=>{const w=i.week||"";if(w!==last){last=w;h+=`<tr class="wkrow"><td colspan="${cols.length+1}">${esc(weekLabel(w))}</td></tr>`}h+=rowHtml(i)});return h})():list.map(rowHtml).join("")}${readOnly?"":rowHtml(null)}</tbody></table>${readOnly&&!list.length?'<div class="empty">Nothing recorded here yet.</div>':""}`;
+    <thead><tr>${cols.map(c=>{if(c.k==="_sel")return `<th scope="col" data-col="_sel" aria-label="Tick to select"></th>`;const on=fActive((colFilters[view]||{})[c.k]);return `<th scope="col" data-col="${c.k}" draggable="true" title="${esc(c.l)}: drag to move, drag the edge to resize"><span class="rsz" data-rsz="${c.k}" draggable="false" aria-hidden="true"></span><div class="thw"><span>${esc(c.l)}</span><button class="fbtn${on?" on":""}" data-fk="${c.k}" aria-label="Filter ${esc(c.l)}${on?" (filter on)":""}" title="Filter this column"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 8.5V19l-4 2v-8.5z"/></svg></button></div></th>`}).join("")}<th aria-label="Delete row"></th></tr></thead>
+    <tbody>${view==="look"?lookBody(list,cols.length+1):list.map(i=>rowHtml(i)).join("")+(readOnly?"":rowHtml(null))}</tbody></table>${readOnly&&!list.length?'<div class="empty">Nothing recorded here yet.</div>':""}`;
   rowSig=new Map(list.map(i=>[i.id,sig(i)]));
   box.querySelectorAll("textarea.cell").forEach(grow);
   restoreFocus(fk);
@@ -1044,6 +1079,8 @@ $("lahead").addEventListener("change",e=>{
 });
 $("lahead").addEventListener("click",e=>{
   const pick=e.target.closest("[data-lapick]");
+  const pk=e.target.closest("[data-lapkg]");
+  if(pk){lookPkg=pk.dataset.lapkg;laSel.clear();closeFilter();tableKey="";render();return}
   if(pick){const w=laWeeks()[+pick.dataset.lapick-1];filtered().forEach(i=>{if(inWeek(i,w.a))laSel.add(i.id)});tableKey="";render();return}
   if(e.target.closest("[data-laclear]")){laSel.clear();tableKey="";render();return}
   if(e.target.closest("[data-lacopy]")){copyLookNextWeek();return}
@@ -1201,15 +1238,15 @@ function commit(el){
     if(view==="delay"){it.identified=today();it.eot="To be assessed"}
     if(view==="action")it.raised=today();
     if(view==="event"&&k!=="date")it.date=today();
-    if(view==="look"&&k!=="week")it.week=laStart;
+    if(view==="look"){it.date=tr.dataset.date||laStart;it.pkg=lookPkg}
     it[k]=val;it.ref=nextRef(view,it.pkg,it.id);
     if(el.classList.contains("chipin")){withNames(it,[val]);el.value=""}
-    if(view==="look"&&k==="week"&&val){it.week=mondayOf(val);el.value=it.week}
     tr.dataset.id=it.id;tr.classList.remove("newrow");
     const t=tr.querySelector('.cell[data-k="title"]');if(t)t.removeAttribute("placeholder");
     const st=tr.querySelector('select[data-k="status"]');if(st&&st.options[0]&&st.options[0].value==="")st.remove(0);
     tr.lastElementChild.outerHTML=delCell(it);
     putItem(it,true);patchRow(tr,it);
+    if(view==="look"){setTimeout(()=>{tableKey="";syncTable()},0);return}
     tr.insertAdjacentHTML("afterend",rowHtml(null));
     if(pkgFilter!=="ALL"&&it.pkg!==pkgFilter)toast(`${it.ref} added to ${it.pkg}.`);
     return;
@@ -1218,10 +1255,10 @@ function commit(el){
   if(el.classList.contains("chipin")){if(!val)return;const it=withNames({...old},namesOf(old).concat(splitNames(val)));el.value="";putItem(it,true);patchRow(tr,it);return}
   if((old[k]==null?"":String(old[k]))===val)return;
   const it={...old};it[k]=val;
-  if(it.kind==="look"&&k==="week"&&val){it.week=mondayOf(val);el.value=it.week}
   if(k==="pkg")it.ref=nextRef(it.kind,val,it.id);
   if(k==="status"){if(isClosed(it)&&!it.closedOn)it.closedOn=today();if(!isClosed(it))delete it.closedOn}
   putItem(it,true);patchRow(tr,it);
+  if(it.kind==="look"&&k==="date")setTimeout(()=>{tableKey="";syncTable()},0);
 }
 function moveTo(tr,k,up){
   while(tr&&tr.classList&&tr.classList.contains("wkrow"))tr=up?tr.previousElementSibling:tr.nextElementSibling;
@@ -1251,6 +1288,9 @@ box.addEventListener("keydown",e=>{
   }
 });
 box.addEventListener("click",e=>{
+  const dsel=e.target.closest("[data-laday]");
+  if(dsel){const d=dsel.dataset.laday, rows=filtered().filter(i=>i.date===d), on=rows.every(i=>laSel.has(i.id));
+    rows.forEach(i=>on?laSel.delete(i.id):laSel.add(i.id));tableKey="";render();return}
   const rm=e.target.closest("[data-rmname]");
   if(rm&&!readOnly){const tr=rm.closest("tr"),it0=items.get(tr.dataset.id);if(!it0)return;
     const it=withNames({...it0},namesOf(it0).filter(n=>n!==rm.dataset.rmname));putItem(it,true);patchRow(tr,it);return}
@@ -1421,16 +1461,15 @@ const LIST_PDF={
       return [["Events recorded",L.length],["With programme or cost impact",L.filter(i=>i.impact&&i.impact!=="None").length],["Period covered",d.length?dShort(d[0])+" to "+dShort(d[d.length-1]):"–"]]},
     group:i=>{const mk=i.date?i.date.slice(0,7):"none";return {key:mk,label:mk==="none"?"No date":new Date(mk+"-01T00:00:00").toLocaleDateString("en-GB",{month:"long",year:"numeric"})}}},
   look:{title:"2 Week Look Ahead",
-    cols:L=>{lookPdfWE=laWeekend||L.some(i=>i.d6||i.d7);const days=(lookPdfWE?DAYN:DAYN.slice(0,5)).map(d=>[d,lookPdfWE?24:32]);
-      return [["Ref",15],["Pkg",11],["Area",lookPdfWE?24:27],["Names",lookPdfWE?28:31]].concat(days,[["Comments",lookPdfWE?31:33]])},
-    row:i=>[i.ref,pkgShort(i.pkg),i.area,namesOf(i).join("\n")].concat((lookPdfWE?DAYK:DAYK.slice(0,5)).map(k=>i[k]||""),[i.comments]),
+    cols:[["Date",24],["Area",50],["Names",58],["Task / work",97],["Comments",48]],
+    row:i=>[`${DAYN[dayIdx(i.date)]} ${dShort(i.date)}`,i.area,namesOf(i).join("\n"),i.title,i.comments],
     tone:()=>null,
     summary:L=>{const out=[];laWeeks().forEach(w=>{const st=laStats(L,w.a,w.b);
-        out.push([`Week ${w.n} (Mon ${dShort(w.a)} to Sun ${dShort(addDays(w.a,6))})`,st.lines?`${st.people} ${st.people===1?"person":"people"}  |  ${st.areas} ${st.areas===1?"area":"areas"}  |  ${st.lines} row${st.lines===1?"":"s"}`:"Nothing planned"])});
+        out.push([`Week ${w.n} (Mon ${dShort(w.a)} to Sun ${dShort(addDays(w.a,6))})`,st.lines?`${st.people} ${st.people===1?"person":"people"}  |  ${st.areas} ${st.areas===1?"area":"areas"}  |  ${st.lines} ${st.lines===1?"entry":"entries"}`:"Nothing planned"])});
       return out},
-    group:i=>({key:"w"+(i.week||""),label:weekLabel(i.week)})}
+    group:i=>{const w=laWeeks().find(w=>inWeek(i,w.a));return {key:i.date,label:`${w?"Week "+w.n+"  |  ":""}${DAYLONG[dayIdx(i.date)]} ${dShort(i.date)}`}}}
 };
-let lookPdfWE=false;
+
 async function buildListPdf(kind,list,filterText){
   const {jsPDF}=window.jspdf, cfg=LIST_PDF[kind];
   const doc=new jsPDF({unit:"mm",format:"a4",orientation:"landscape",compress:true});
@@ -1493,8 +1532,9 @@ async function buildListPdf(kind,list,filterText){
 async function exportListPdf(){
   if(view==="progress"||!downloads||!window.jspdf)return;
   const list=filtered(), cfg=LIST_PDF[view];
+  if(view==="look")cfg.title="2 Week Look Ahead – "+pkgLabel(lookPkg);
   if(!list.length){toast(`There are no ${SCHEMA[view].tab.toLowerCase()} entries to put in a PDF with these filters.`);return}
-  const bits=[pkgFilter==="ALL"?"All packages":pkgLabel(pkgFilter)];
+  const bits=[view==="look"?pkgLabel(lookPkg):pkgFilter==="ALL"?"All packages":pkgLabel(pkgFilter)];
   if(q.trim())bits.push(`search "${q.trim()}"`);
   if(hideClosed&&view!=="event"&&view!=="look")bits.push("closed items hidden");
   {const ac=activeCols();if(ac.length)bits.push("filtered by "+ac.map(c=>c.l).join(", "))}
@@ -1628,8 +1668,8 @@ const XL={
   delay:{sheet:"Delay Log",map:{"Ref":"ref","Package":"pkg","Delay description":"title","Cause":"cause","Impact":"impact","Date identified":"identified","Responsible party":"responsible","Planned date":"original","Forecast date":"revised","Status":"status","EOT claim":"eot","Mitigation / recovery plan":"mitigation","Date closed":"closedOn","Comments":"comments"}},
   action:{sheet:"Action Tracker",map:{"Action No.":"ref","Package":"pkg","Description":"title","Raised in":"source","Date Raised":"raised","Act Owner":"owner","Due Date":"due","Date Closed":"closedOn","Status":"status","Comments/Response":"notes"},
     alias:{"Ref":"ref","Action":"title","Owner":"owner","Raised at":"source","Date raised":"raised","Due date":"due","Update / comments":"notes","Date closed":"closedOn"}},
-  look:{sheet:"Look Ahead",map:{"Ref":"ref","Package":"pkg","Week commencing":"week","Area":"area","Names":"name","Monday":"d1","Tuesday":"d2","Wednesday":"d3","Thursday":"d4","Friday":"d5","Saturday":"d6","Sunday":"d7","Comments":"comments"},
-    alias:{"Name":"name","From":"from","To":"to","Description of work":"title"}},
+  look:{sheet:"Look Ahead",map:{"Ref":"ref","Package":"pkg","Date":"date","Area":"area","Names":"name","Task / work":"title","Comments":"comments"},
+    alias:{"Name":"name","From":"from","To":"to","Description of work":"title","Week commencing":"week","Monday":"d1","Tuesday":"d2","Wednesday":"d3","Thursday":"d4","Friday":"d5","Saturday":"d6","Sunday":"d7"}},
   event:{sheet:"Timeline",map:{"Ref":"ref","Package":"pkg","Date":"date","Type":"type","Event":"title","Impact":"impact","Related ref":"related","Who":"who","Details / outcome":"notes"}},
   todo:{sheet:"To-Do List",map:{"Ref":"ref","Package":"pkg","Task":"title","Owner":"owner","Company":"company","Due date":"due","Priority":"priority","Status":"status","Notes":"notes"},alias:{"Who":"owner"}}
 };
@@ -1725,7 +1765,12 @@ async function importXlsx(file){
       const ex=fref&&byRef.get(kind+"|"+fref);
       const it=ex?{...ex}:{id:newId(),kind,createdAt:base+(n++)};
       S.fields.forEach(f=>{if(f.t==="pkg")return;const v=o[f.k];it[f.k]=DATEK.has(f.k)?iso(v):String(v==null?"":v).trim()});
-      if(kind==="look"){withNames(it,[it.name||""]);if(it.week)it.week=mondayOf(it.week);else lookFromRange(it,iso(o.from),iso(o.to),String(o.title||"").trim())}
+      if(kind==="look"){withNames(it,[it.name||""]);
+        if(!it.date){const leg={...it};
+          if(o.week){leg.week=mondayOf(iso(o.week)||String(o.week));DAYK.forEach(k=>{leg[k]=String(o[k]==null?"":o[k]).trim()})}
+          else lookFromRange(leg,iso(o.from),iso(o.to),String(o.title||"").trim());
+          splitLook(leg).forEach(pt=>{pt.ref=nextRef("look",pt.pkg,pt.id);pt.updatedAt=Date.now();items.set(pt.id,pt);out.push(pt);added++});
+          continue}}
       normItem(it);const sf=S.fields.find(f=>f.k==="status");if(sf&&!sf.o.includes(it.status))it.status=sf.o[0];
       it.pkg=pk;
       it.ref=ex?ex.ref:(fref||nextRef(kind,pk,it.id));
@@ -1820,7 +1865,7 @@ let tt;function toast(m){const t=$("toast");t.textContent=m;t.classList.add("on"
 
 /* ---------- other events ---------- */
 $("lanes").addEventListener("click",e=>{const b=e.target.closest(".lane");if(!b)return;
-  pkgFilter=pkgFilter===b.dataset.pkg?"ALL":b.dataset.pkg;if(pkgFilter!=="ALL"){newPkg=pkgFilter;progPkg=pkgFilter}render()});
+  pkgFilter=pkgFilter===b.dataset.pkg?"ALL":b.dataset.pkg;if(pkgFilter!=="ALL"){newPkg=pkgFilter;progPkg=pkgFilter;lookPkg=pkgFilter;laSel.clear()}render()});
 $("tabs").addEventListener("click",e=>{const b=e.target.closest(".tab");if(!b)return;enterView(b.dataset.k);render()});
 $("tabs").addEventListener("keydown",e=>{
   if(e.key!=="ArrowRight"&&e.key!=="ArrowLeft")return;
@@ -1884,7 +1929,7 @@ if(!(window.claude&&typeof window.claude.use==="function"))tryRepoLogo(["logo.sv
       }
     }
     if(snap.empty&&!migrated)return;
-    items=new Map();snap.docs.forEach(x=>{const v=x.data();if(v)items.set(x.id,normItem({...v,id:x.id}))});
+    items=new Map();snap.docs.forEach(x=>{const v=x.data();if(v)items.set(x.id,normItem({...v,id:x.id}))});migrateLookItems(true);
     render();
   },()=>{mode="local";db=null;toast("Live saving stopped. Changes now save on this device.");render()});
   const pendingProg=clone(progress);let pmig=false;
