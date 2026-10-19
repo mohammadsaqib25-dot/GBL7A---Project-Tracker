@@ -239,6 +239,11 @@ td.dc{text-align:center}
 .lactl input[type=date]{border:1px solid var(--line);background:var(--paper);border-radius:6px;padding:5px 8px}
 .lactl .nav{display:flex;gap:6px}
 .lactl .nav button{border:1px solid var(--line);background:var(--paper);border-radius:6px;padding:4px 10px;cursor:pointer;font-weight:600;color:var(--ink)}
+.lasel{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:.82rem;color:var(--muted);font-weight:600;padding-top:7px;border-top:1px solid var(--soft)}
+.lasel button{border:1px solid var(--line);background:var(--paper);border-radius:6px;padding:4px 10px;cursor:pointer;font-weight:600;color:var(--ink)}
+.lasel button.go{background:var(--brand);border-color:var(--brand);color:#fff}
+.selbox{width:16px;height:16px;margin:0 8px 0 0;vertical-align:-3px;accent-color:var(--brand);cursor:pointer}
+.grid tr.sel td{background:var(--secbg)}
 .lawk{flex:1 1 260px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:6px;padding:9px 14px}
 .lawk h4{margin:0;font-size:.95rem;font-stretch:80%;font-weight:800;color:var(--accent)}
 .lawk h4 span{font-weight:500;color:var(--muted);font-stretch:100%;font-size:.8rem;margin-left:6px}
@@ -456,7 +461,6 @@ const SCHEMA={
   ]},
   look:{tab:"2 Week Look Ahead",noun:"look-ahead entry",letter:"L",closed:"__never__",fields:[
     {k:"pkg",t:"pkg"},{k:"from",t:"date"},{k:"to",t:"date"},{k:"area",t:"text"},{k:"name",t:"text"},
-    {k:"role",t:"select",o:["Welder","Pipefitter","GO","Supervisor","Other"]},
     {k:"title",t:"text"},{k:"comments",t:"area"}
   ]},
   todo:{tab:"To-do",noun:"task",letter:"T",closed:"Complete",fields:[
@@ -603,12 +607,11 @@ const GRID={
     {k:"related",l:"Related ref",t:"text",w:130},
     {k:"who",l:"Who",t:"text",w:140},
     {k:"notes",l:"Details / outcome",t:"long",w:320}],
-  look:[REF,PKG,
+  look:[{k:"ref",l:"Ref",t:"ro",w:124},PKG,
     {k:"from",l:"From",t:"date",w:136},
     {k:"to",l:"To",t:"date",w:136},
     {k:"area",l:"Area",t:"text",w:170},
     {k:"name",l:"Name",t:"text",w:170},
-    {k:"role",l:"Role",t:"select",w:132},
     {k:"title",l:"Description of work",t:"long",w:340},
     {k:"comments",l:"Comments",t:"long",w:260}],
   todo:[REF,PKG,
@@ -722,21 +725,43 @@ function renderFilterline(){
   if(q.trim())bits.push(`Matching "${esc(q.trim())}". <button data-clear="q">Clear search</button>`);
   const tips=[];
   if(view==="event"&&tlView()==="timeline")tips.push(all("event",pkgFilter).length?"Newest at the bottom. Click an event to edit it in the table.":"");
-  if(view==="look")tips.push(laAll?"Showing all dates.":`Showing work planned between ${dShort(laStart)} and ${dShort(laEnd())}. Use one row per person; Copy on a row adds another person to the same work.`);
+  if(view==="look")tips.push(laAll?"Showing all dates.":`Showing work planned between ${dShort(laStart)} and ${dShort(laEnd())}. Use one row per person; Copy on a row adds another person to the same work. To roll work forward, tick lines (or Select Week 1) and press Copy to next week.`);
   if(view==="action")tips.push(`Status is automatic: <b>On track</b> until the due date, <b>Slipping</b> up to ${SLIP_DAYS} days late, <b>Issue</b> after that, and <b>Closed</b> once a Date Closed is entered.`);
   if(!readOnly&&!(view==="event"&&tlView()==="timeline"))tips.push(`Click any cell to type; changes save as you go. Enter moves down, Shift+Enter starts a new line. Type in the last row to add ${aN(SCHEMA[view].noun)}.`);
   $("filterline").innerHTML=bits.join(" ")+(tips.join("")?`${bits.length?" ":""}<span class="tip">${tips.join(" ")}</span>`:"");
+}
+let laSel=new Set();
+function laStats(list,a,b){const L=list.filter(i=>overlaps(i,a,b));
+  return {lines:L.length,people:new Set(L.map(i=>(i.name||"").trim().toLowerCase()||"row:"+i.id)).size,areas:new Set(L.map(i=>(i.area||"").trim().toLowerCase()).filter(Boolean)).size}}
+const selBox=i=>readOnly?"":`<input type="checkbox" class="selbox" data-sel="${i.id}"${laSel.has(i.id)?" checked":""} aria-label="Select ${esc(i.ref)}">`;
+const roHtml=(c,i)=>c.calc?c.calc(i):(c.k==="ref"&&i.kind==="look"?selBox(i):"")+esc(i[c.k]||"");
+async function copyLookNextWeek(){
+  if(readOnly)return;
+  const src=[...laSel].map(id=>items.get(id)).filter(Boolean);if(!src.length)return;
+  const key=i=>[i.pkg,(i.area||"").trim().toLowerCase(),(i.name||"").trim().toLowerCase(),(i.title||"").trim().toLowerCase(),i.from||"",i.to||""].join("|");
+  const have=new Set();items.forEach(i=>{if(i.kind==="look")have.add(key(i))});
+  const made=[];let skipped=0,t=Date.now();
+  src.sort((a,b)=>(a.from||"").localeCompare(b.from||"")||(a.createdAt||0)-(b.createdAt||0)).forEach(s=>{
+    const it={...s,id:newId(),createdAt:t++,updatedAt:Date.now()};
+    if(it.from)it.from=addDays(it.from,7);if(it.to)it.to=addDays(it.to,7);
+    if(have.has(key(it))){skipped++;return}
+    it.ref=nextRef("look",it.pkg,it.id);items.set(it.id,it);have.add(key(it));made.push(it)});
+  laSel.clear();tableKey="";render();
+  if(mode==="db"){for(const it of made){try{await db.collection("items").doc(it.id).set(it)}catch(e){failed(e);return}}}else saveLocal();
+  const outside=made.some(i=>!laAll&&(i.from||i.to)&&!overlaps(i,laStart,laEnd()));
+  toast(made.length?`${made.length} line item${made.length===1?"":"s"} copied to the next week${skipped?`, ${skipped} already there`:""}.${outside?" Use Week ▶ to see them.":""}`:"Those lines are already in the next week.");
 }
 function renderLaHead(){
   const el=$("lahead");if(view!=="look"){el.hidden=true;return}
   el.hidden=false;
   const list=all("look",pkgFilter);
-  const wk=laWeeks().map(w=>{const c=crew(list,w.a,w.b);
-    const parts=roleOrder.filter(r=>c.roles[r]).map(r=>`<span><b>${c.roles[r]}</b> ${r==="No role"?"no role set":esc(plural(c.roles[r],r).replace(/^\d+ /,""))}</span>`).join("");
-    return `<div class="lawk"><h4>Week ${w.n}<span>${dShort(w.a)} to ${dShort(addDays(w.a,4))}</span></h4><div class="cnt">${parts||'<span style="color:var(--muted)">Nobody planned yet</span>'}<span class="tot">${c.people} ${c.people===1?"person":"people"}</span></div></div>`}).join("");
+  const wk=laWeeks().map(w=>{const st=laStats(list,w.a,w.b);
+    return `<div class="lawk"><h4>Week ${w.n}<span>${dShort(w.a)} to ${dShort(addDays(w.a,4))}</span></h4><div class="cnt">${st.lines?`<span><b>${st.people}</b> ${st.people===1?"person":"people"}</span><span><b>${st.areas}</b> ${st.areas===1?"area":"areas"}</span><span class="tot">${st.lines} line item${st.lines===1?"":"s"}</span>`:'<span style="color:var(--muted)">Nothing planned yet</span>'}</div></div>`}).join("");
+  const n=[...laSel].filter(id=>items.has(id)).length;
   el.innerHTML=`<div class="lactl"><label>Look-ahead from <input type="date" id="laStart" value="${laStart}"></label>
     <div class="nav"><button data-lanav="-7" title="Previous week">◀ Week</button><button data-lanav="0">This week</button><button data-lanav="7" title="Next week">Week ▶</button></div>
-    <label><input type="checkbox" id="laAll"${laAll?" checked":""}> Show all dates</label></div>${wk}`;
+    <label><input type="checkbox" id="laAll"${laAll?" checked":""}> Show all dates</label>
+    ${readOnly?"":`<div class="lasel"><span>Select</span><button data-lapick="1" title="Tick every line in Week 1">Week 1</button><button data-lapick="2" title="Tick every line in Week 2">Week 2</button>${n?`<button class="go" data-lacopy title="Copy the ticked lines with their dates moved on 7 days">Copy ${n} to next week</button><button data-laclear>Clear</button>`:""}</div>`}</div>${wk}`;
 }
 function renderChrome(){renderLanes();renderTabs();renderSync();renderName();renderLogo();renderLaHead()}
 function render(){renderChrome();renderFilterline();syncTable()}
@@ -777,7 +802,7 @@ function delCell(i){return readOnly?"<td></td>":`<td class="dc">${i.kind==="look
 function rowHtml(i){
   const isNew=!i, dis=readOnly?" disabled":"";
   const tds=colsFor(view).map(c=>{
-    if(c.t==="ro")return isNew?`<td class="ro">${c.k==="ref"?"New":""}</td>`:`<td class="ro">${c.calc?c.calc(i):esc(i[c.k]||"")}</td>`;
+    if(c.t==="ro")return isNew?`<td class="ro">${c.k==="ref"?"New":""}</td>`:`<td class="ro">${roHtml(c,i)}</td>`;
     const v=isNew?(c.t==="pkg"?newPkg:""):(i[c.k]==null?"":String(i[c.k]));
     const a=`class="cell" data-k="${c.k}" aria-label="${esc(c.l)}"${dis}`;
     let inner,cls="",dv="";
@@ -791,7 +816,7 @@ function rowHtml(i){
     else inner=`<textarea rows="1" ${a}${isNew&&c.k==="title"?` placeholder="Type here to add ${aN(SCHEMA[view].noun)}"`:""}>${esc(v)}</textarea>`;
     return `<td${cls?` class="${cls}"`:""}${dv}>${inner}</td>`;
   }).join("");
-  return `<tr data-id="${isNew?"new":i.id}" class="${isNew?"newrow":isClosed(i)?"closed":""}">${tds}${isNew?"<td></td>":delCell(i)}</tr>`;
+  return `<tr data-id="${isNew?"new":i.id}" class="${isNew?"newrow":(isClosed(i)?"closed":"")+(laSel.has(i.id)?" sel":"")}">${tds}${isNew?"<td></td>":delCell(i)}</tr>`;
 }
 function captureFocus(root){
   root=root||$("tablebox");const a=document.activeElement;
@@ -820,7 +845,7 @@ function patchRow(tr,i){
   tr.classList.toggle("closed",isClosed(i));
   colsFor(i.kind).forEach((c,ci)=>{
     const td=tr.children[ci];if(!td)return;
-    if(c.t==="ro"){td.innerHTML=c.calc?c.calc(i):esc(i[c.k]||"");return}
+    if(c.t==="ro"){td.innerHTML=roHtml(c,i);return}
     const el=td.querySelector(".cell"), v=i[c.k]==null?"":String(i[c.k]);
     if(el&&el!==document.activeElement&&el.value!==v){el.value=v;if(el.tagName==="TEXTAREA")grow(el)}
     if(c.t==="pkg")td.className="pk "+v;
@@ -973,7 +998,12 @@ $("lahead").addEventListener("change",e=>{
   if(e.target.id==="laStart"&&e.target.value){laStart=mondayOf(e.target.value);render()}
   if(e.target.id==="laAll"){laAll=e.target.checked;render()}
 });
-$("lahead").addEventListener("click",e=>{const b=e.target.closest("[data-lanav]");if(!b)return;
+$("lahead").addEventListener("click",e=>{
+  const pick=e.target.closest("[data-lapick]");
+  if(pick){const w=laWeeks()[+pick.dataset.lapick-1];filtered().forEach(i=>{if(overlaps(i,w.a,w.b))laSel.add(i.id)});tableKey="";render();return}
+  if(e.target.closest("[data-laclear]")){laSel.clear();tableKey="";render();return}
+  if(e.target.closest("[data-lacopy]")){copyLookNextWeek();return}
+  const b=e.target.closest("[data-lanav]");if(!b)return;
   const n=+b.dataset.lanav;laStart=n===0?mondayOf(today()):addDays(laStart,n);render()});
 $("tlseg").addEventListener("click",e=>{const b=e.target.closest("[data-tl]");if(!b)return;tlMode=b.dataset.tl;tlManual=true;render()});
 $("tlbox").addEventListener("click",e=>{
@@ -1152,6 +1182,8 @@ function moveTo(tr,k){
 const box=$("tablebox");
 box.addEventListener("change",e=>{if(e.target.classList&&e.target.classList.contains("cell"))commit(e.target)});
 box.addEventListener("input",e=>{if(e.target.tagName==="TEXTAREA")grow(e.target)});
+box.addEventListener("change",e=>{const s=e.target.closest&&e.target.closest(".selbox");if(!s)return;
+  if(s.checked)laSel.add(s.dataset.sel);else laSel.delete(s.dataset.sel);s.closest("tr").classList.toggle("sel",s.checked);renderLaHead()});
 box.addEventListener("keydown",e=>{
   const el=e.target;if(!el.classList||!el.classList.contains("cell"))return;
   const tr=el.closest("tr"),k=el.dataset.k;
@@ -1331,11 +1363,11 @@ const LIST_PDF={
       return [["Events recorded",L.length],["With programme or cost impact",L.filter(i=>i.impact&&i.impact!=="None").length],["Period covered",d.length?dShort(d[0])+" to "+dShort(d[d.length-1]):"–"]]},
     group:i=>{const mk=i.date?i.date.slice(0,7):"none";return {key:mk,label:mk==="none"?"No date":new Date(mk+"-01T00:00:00").toLocaleDateString("en-GB",{month:"long",year:"numeric"})}}},
   look:{title:"2 Week Look Ahead",
-    cols:[["Ref",17],["Pkg",13],["From",16],["To",16],["Area",32],["Name",34],["Role",22],["Description of work",80],["Comments",47]],
-    row:i=>[i.ref,pkgShort(i.pkg),dShort(i.from),dShort(i.to),i.area,i.name,i.role,i.title,i.comments],
+    cols:[["Ref",17],["Pkg",13],["From",16],["To",16],["Area",36],["Name",38],["Description of work",92],["Comments",49]],
+    row:i=>[i.ref,pkgShort(i.pkg),dShort(i.from),dShort(i.to),i.area,i.name,i.title,i.comments],
     tone:()=>null,
-    summary:L=>{const out=[];laWeeks().forEach(w=>{const c=crew(L,w.a,w.b);
-        out.push([`Week ${w.n} (${dShort(w.a)} to ${dShort(addDays(w.a,4))})`,(roleOrder.filter(r=>c.roles[r]&&r!=="No role").map(r=>plural(c.roles[r],r)).join(", ")||"Nobody planned")+(c.people?`  |  ${c.people} ${c.people===1?"person":"people"}`:"")])});
+    summary:L=>{const out=[];laWeeks().forEach(w=>{const st=laStats(L,w.a,w.b);
+        out.push([`Week ${w.n} (${dShort(w.a)} to ${dShort(addDays(w.a,4))})`,st.lines?`${st.people} ${st.people===1?"person":"people"}  |  ${st.areas} ${st.areas===1?"area":"areas"}  |  ${st.lines} line item${st.lines===1?"":"s"}`:"Nothing planned"])});
       return out},
     group:i=>{const f=i.from||i.to;if(!f)return {key:"none",label:"No dates set"};
       const w=laWeeks().find(w=>overlaps(i,w.a,w.b));
@@ -1538,7 +1570,7 @@ const XL={
   delay:{sheet:"Delay Log",map:{"Ref":"ref","Package":"pkg","Delay description":"title","Cause":"cause","Impact":"impact","Date identified":"identified","Responsible party":"responsible","Planned date":"original","Forecast date":"revised","Status":"status","EOT claim":"eot","Mitigation / recovery plan":"mitigation","Date closed":"closedOn","Comments":"comments"}},
   action:{sheet:"Action Tracker",map:{"Action No.":"ref","Package":"pkg","Description":"title","Raised in":"source","Date Raised":"raised","Act Owner":"owner","Due Date":"due","Date Closed":"closedOn","Status":"status","Comments/Response":"notes"},
     alias:{"Ref":"ref","Action":"title","Owner":"owner","Raised at":"source","Date raised":"raised","Due date":"due","Update / comments":"notes","Date closed":"closedOn"}},
-  look:{sheet:"Look Ahead",map:{"Ref":"ref","Package":"pkg","From":"from","To":"to","Area":"area","Name":"name","Role":"role","Description of work":"title","Comments":"comments"}},
+  look:{sheet:"Look Ahead",map:{"Ref":"ref","Package":"pkg","From":"from","To":"to","Area":"area","Name":"name","Description of work":"title","Comments":"comments"}},
   event:{sheet:"Timeline",map:{"Ref":"ref","Package":"pkg","Date":"date","Type":"type","Event":"title","Impact":"impact","Related ref":"related","Who":"who","Details / outcome":"notes"}},
   todo:{sheet:"To-Do List",map:{"Ref":"ref","Package":"pkg","Task":"title","Owner":"owner","Company":"company","Due date":"due","Priority":"priority","Status":"status","Notes":"notes"},alias:{"Who":"owner"}}
 };
