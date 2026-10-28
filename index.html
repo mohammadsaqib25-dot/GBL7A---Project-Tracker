@@ -177,7 +177,7 @@ td.pk{--c:var(--fsa);box-shadow:inset 4px 0 0 var(--c)}
 td.pk.MYD{--c:var(--myd)} td.pk.ML{--c:var(--ml)} td.pk.ALL{--c:var(--muted)}
 td.pk .cell{font-weight:800;font-stretch:72%;font-size:1rem;color:var(--c);padding-left:12px}
 td[data-v="High"],td[data-v="Critical"]{background:var(--redbg)}
-td[data-v="Medium"],td[data-v="Mitigating"],td[data-v="In progress"],td[data-v="In Progress"],td[data-v="Doing"]{background:var(--ambg)}
+td[data-v="Medium"],td[data-v="Mitigating"],td[data-v="In progress"],td[data-v="In Progress"],td[data-v="Doing"],td[data-v="Responded"]{background:var(--ambg)}
 td[data-v="Resolved"],td[data-v="Closed"],td[data-v="Done"],td[data-v="Complete"]{background:var(--okbg)}
 td[data-v="Programme"],td[data-v="Cost"]{background:var(--ambg)}
 td[data-v="Programme and cost"]{background:var(--redbg)}
@@ -540,6 +540,15 @@ const SCHEMA={
     {k:"raised",t:"date"},{k:"owner",t:"text"},{k:"due",t:"date"},{k:"closedOn",t:"date"},
     {k:"notes",t:"area"}
   ]},
+  rfi:{tab:"RFI",noun:"RFI",letter:"RFI-",closed:"Closed",fields:[
+    {k:"pkg",t:"pkg"},{k:"title",t:"text"},{k:"question",t:"area"},
+    {k:"discipline",t:"select",o:["Mechanical","Plumbing","Electrical","Controls / BMS","Structural","Architectural","Process / client","Other"]},
+    {k:"raisedBy",t:"text"},{k:"addressee",t:"text"},{k:"raised",t:"date"},{k:"due",t:"date"},{k:"respDate",t:"date"},
+    {k:"response",t:"area"},
+    {k:"impact",t:"select",o:["None","Programme","Cost","Programme and cost"]},
+    {k:"status",t:"select",o:["Open","Responded","Closed"]},
+    {k:"docref",t:"text"},{k:"comments",t:"area"}
+  ]},
   event:{tab:"Timeline",noun:"event",letter:"E",closed:"__never__",fields:[
     {k:"pkg",t:"pkg"},{k:"date",t:"date"},
     {k:"type",t:"select",o:["Milestone","Site event","Meeting","Instruction / variation","Delivery","Inspection / test","Incident","Handover","Correspondence","Other"]},
@@ -702,9 +711,9 @@ function actStatus(i){
   return days(i.due,today())<=SLIP_DAYS?"Slipping":"Issue";
 }
 const astHtml=i=>{const s=actStatus(i);return `<span class="ast ${s.replace(/\s/g,"").toLowerCase()}">${s}</span>`};
-const overdue=i=>!isClosed(i)&&i.due&&i.due<today();
+const overdue=i=>!isClosed(i)&&i.due&&i.due<today()&&!(i.kind==="rfi"&&i.status==="Responded");
 const slip=i=>days(i.original,i.revised);
-const aN=w=>(/^[aeiou]/i.test(w)?"an ":"a ")+w;
+const aN=w=>(/^([aeiou]|RFI)/i.test(w)?"an ":"a ")+w;
 const sig=i=>JSON.stringify(Object.keys(i).sort().map(k=>[k,i[k]]));
 
 /* ---------- grid columns ---------- */
@@ -734,6 +743,20 @@ const GRID={
     {k:"closedOn",l:"Date Closed",t:"date",w:136},
     {k:"_ast",l:"Status",t:"ro",w:112,calc:astHtml},
     {k:"notes",l:"Comments/Response",t:"long",w:320}],
+  rfi:[{k:"ref",l:"RFI No.",t:"ro",w:118},PKG,
+    {k:"title",l:"Subject",t:"long",w:220},
+    {k:"question",l:"Question / description",t:"long",w:300},
+    {k:"discipline",l:"Discipline",t:"select",w:140},
+    {k:"raisedBy",l:"Raised by",t:"text",w:130},
+    {k:"addressee",l:"Addressed to",t:"text",w:140},
+    {k:"raised",l:"Date raised",t:"date",w:136},
+    {k:"due",l:"Response due",t:"date",w:136},
+    {k:"respDate",l:"Date responded",t:"date",w:136},
+    {k:"response",l:"Response",t:"long",w:300},
+    {k:"impact",l:"Impact",t:"select",w:150,vcol:1},
+    {k:"status",l:"Status",t:"select",w:118,vcol:1},
+    {k:"docref",l:"Drawing / spec ref",t:"text",w:150},
+    {k:"comments",l:"Comments",t:"long",w:220}],
   event:[REF,PKG,
     {k:"date",l:"Date",t:"date",w:136},
     {k:"type",l:"Type",t:"select",w:176},
@@ -819,6 +842,7 @@ function renderLanes(){
     const a=all("action",p.id).filter(i=>!isClosed(i));
     const od=a.filter(overdue).length;
     const tl=all("todo",p.id).filter(i=>!isClosed(i));const t=tl.length;const tod=tl.filter(overdue).length;
+    const rl=all("rfi",p.id).filter(i=>i.status==="Open"), ro=rl.length, rod=rl.filter(overdue).length;
     const eot=all("delay",p.id).filter(i=>i.eot==="To be assessed"||i.eot==="Submitted").length;
     const longest=d.reduce((m,i)=>{const s=slip(i);return s!=null&&s>m?s:m},0);
     const crit=d.filter(i=>i.impact==="High"||i.impact==="Critical").length;
@@ -832,6 +856,7 @@ function renderLanes(){
         <dt>Open actions</dt><dd>${a.length}</dd>
         <dt>Overdue actions</dt><dd class="${od?'bad':''}">${od}</dd>
         <dt>To-dos left</dt><dd class="${tod?'bad':''}">${t}${tod?` (${tod} overdue)`:''}</dd>
+        <dt>Open RFIs</dt><dd class="${rod?'bad':''}">${ro}${rod?` (${rod} overdue)`:''}</dd>
         <dt>Progress</dt><dd>${progTxt(p.id)}</dd>
       </dl></button>`}).join("");
 }
@@ -842,7 +867,8 @@ const NAV_ICON={
   todo:'<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/>',
   event:'<path d="M12 3v18"/><circle cx="12" cy="7" r="2.2"/><circle cx="12" cy="17" r="2.2"/><path d="M14 7h6M4 17h6"/>',
   look:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M7 13h3M7 17h3M14 13h3"/>',
-  progress:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'
+  progress:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  rfi:'<circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/>'
 };
 const NAV_LABEL={dash:"Dashboard",progress:"Progress"};
 let navCollapsed=false;try{navCollapsed=localStorage.getItem("pmt-nav")==="1"}catch(e){}
@@ -882,6 +908,7 @@ function renderFilterline(){
   const tips=[];
   if(view==="event"&&tlView()==="timeline")tips.push(all("event",pkgFilter).length?"Newest at the bottom. Click an event to edit it in the table.":"");
   if(view==="look")tips.push(`${lookPkg==="ALL"?"All packages":esc(lookPkg)}: every day has its own heading. Type in the shaded row under a day to add an entry with its area, names and work; add names with Enter or a comma. To roll a week forward, click a Week box (or tick entries) and press Copy to next week.`);
+  if(view==="rfi")tips.push("Response due turns red when an Open RFI passes it. Entering a Date responded marks it Responded; set it to Closed once the answer is accepted.");
   if(view==="action")tips.push(`Status is automatic: <b>On track</b> until the due date, <b>Slipping</b> up to ${SLIP_DAYS} days late, <b>Issue</b> after that, and <b>Closed</b> once a Date Closed is entered.`);
   if(!readOnly&&view!=="look"&&!(view==="event"&&tlView()==="timeline"))tips.push(`Click any cell to type; changes save as you go. Enter moves down, Shift+Enter starts a new line. Type in the last row to add ${aN(SCHEMA[view].noun)}.`);
   $("filterline").innerHTML=bits.join(" ")+(tips.join("")?`${bits.length?" ":""}<span class="tip">${tips.join(" ")}</span>`:"");
@@ -949,7 +976,7 @@ function filtered(skipCol){
   let list=all(view,view==="look"?lookPkg:pkgFilter);
   if(hideClosed)list=list.filter(i=>!isClosed(i));
   if(GRID[view])list=list.filter(i=>passCols(i,skipCol));
-  if(s)list=list.filter(i=>[i.ref,i.title,i.owner,i.responsible,i.notes,i.mitigation,i.comments,i.cause,i.source,i.type,i.related,i.who,i.company,i.area,i.name,i.role,i.d1,i.d2,i.d3,i.d4,i.d5,i.d6,i.d7,i.kind==="action"?actStatus(i):""].some(v=>v&&String(v).toLowerCase().includes(s)));
+  if(s)list=list.filter(i=>[i.ref,i.title,i.owner,i.responsible,i.notes,i.mitigation,i.comments,i.cause,i.source,i.type,i.related,i.who,i.company,i.area,i.name,i.role,i.d1,i.d2,i.d3,i.d4,i.d5,i.d6,i.d7,i.question,i.response,i.addressee,i.raisedBy,i.discipline,i.docref,i.kind==="action"?actStatus(i):""].some(v=>v&&String(v).toLowerCase().includes(s)));
   if(view==="look"){const a=laStart,b=addDays(laStart,13);list=list.filter(i=>i.date&&i.date>=a&&i.date<=b);
     return list.sort((x,y)=>(x.date||"").localeCompare(y.date||"")||String(x.area||"").localeCompare(String(y.area||""))||(x.createdAt||0)-(y.createdAt||0))}
   if(view==="event")return list.sort((a,b)=>(a.date||"9999").localeCompare(b.date||"9999")||(a.createdAt||0)-(b.createdAt||0));
@@ -1345,7 +1372,7 @@ function commit(el){
     if(!val)return;
     const it={id:newId(),kind:view,createdAt:Date.now(),pkg:newPkg,status:opt(view,"status")[0]};
     if(view==="delay"){it.identified=today();it.eot="To be assessed"}
-    if(view==="action")it.raised=today();
+    if(view==="action"||view==="rfi")it.raised=today();
     if(view==="event"&&k!=="date")it.date=today();
     if(view==="look"){it.date=tr.dataset.date||laStart;it.pkg=lookPkg==="ALL"?newPkg:lookPkg}
     it[k]=val;it.ref=nextRef(view,it.pkg,it.id);
@@ -1365,6 +1392,7 @@ function commit(el){
   if((old[k]==null?"":String(old[k]))===val)return;
   const it={...old};it[k]=val;
   if(k==="pkg")it.ref=nextRef(it.kind,val,it.id);
+  if(it.kind==="rfi"&&k==="respDate"&&val&&it.status==="Open")it.status="Responded";
   if(k==="status"){if(isClosed(it)&&!it.closedOn)it.closedOn=today();if(!isClosed(it))delete it.closedOn}
   putItem(it,true);patchRow(tr,it);
   if(it.kind==="look"&&k==="date")setTimeout(()=>{tableKey="";syncTable()},0);
@@ -1562,6 +1590,11 @@ const LIST_PDF={
     row:i=>[i.ref,pkgShort(i.pkg),i.title,i.owner,i.company,i.due?dShort(i.due)+(overdue(i)?"\n"+days(i.due,today())+" d late":""):"",i.priority,i.status,i.notes],
     tone:(i,c)=>(c===5&&overdue(i))?"red":null,
     summary:L=>[["To-dos left",L.filter(i=>!isClosed(i)).length],["Overdue",L.filter(overdue).length],["Complete",L.filter(isClosed).length]]},
+  rfi:{title:"RFI Register",
+    cols:[["RFI No.",22],["Pkg",12],["Subject",36],["Question",62],["Addressed to",22],["Raised",16],["Due",18],["Responded",18],["Response",54],["Status",17]],
+    row:i=>[i.ref,pkgShort(i.pkg),i.title,i.question,i.addressee,dShort(i.raised),i.due?dShort(i.due)+(overdue(i)?"\n"+days(i.due,today())+" d late":""):"",dShort(i.respDate),i.response,i.status],
+    tone:(i,c)=>{if(c===6&&overdue(i))return "red";if(c!==9)return null;return i.status==="Open"?(overdue(i)?"red":"amber"):i.status==="Closed"?"green":null},
+    summary:L=>[["Open",L.filter(i=>i.status==="Open").length],["Overdue",L.filter(overdue).length],["Responded",L.filter(i=>i.status==="Responded").length],["Closed",L.filter(isClosed).length]]},
   event:{title:"Project Timeline",
     cols:[["Ref",18],["Pkg",13],["Date",17],["Type",30],["Event",70],["Impact",27],["Related ref",22],["Who",26],["Details / outcome",54]],
     row:i=>[i.ref,pkgShort(i.pkg),dShort(i.date),i.type,i.title,i.impact&&i.impact!=="None"?i.impact:"",i.related,i.who,i.notes],
@@ -1797,10 +1830,11 @@ const XL={
     alias:{"Ref":"ref","Action":"title","Owner":"owner","Raised at":"source","Date raised":"raised","Due date":"due","Update / comments":"notes","Date closed":"closedOn"}},
   look:{sheet:"Look Ahead",map:{"Ref":"ref","Package":"pkg","Date":"date","Area":"area","Names":"name","Task / work":"title","Comments":"comments"},
     alias:{"Name":"name","From":"from","To":"to","Description of work":"title","Week commencing":"week","Monday":"d1","Tuesday":"d2","Wednesday":"d3","Thursday":"d4","Friday":"d5","Saturday":"d6","Sunday":"d7"}},
+  rfi:{sheet:"RFI Register",map:{"RFI No.":"ref","Package":"pkg","Subject":"title","Question / description":"question","Discipline":"discipline","Raised by":"raisedBy","Addressed to":"addressee","Date raised":"raised","Response due":"due","Date responded":"respDate","Response":"response","Impact":"impact","Status":"status","Drawing / spec ref":"docref","Comments":"comments"},alias:{"RFI":"ref","Ref":"ref","Question":"question","Due":"due"}},
   event:{sheet:"Timeline",map:{"Ref":"ref","Package":"pkg","Date":"date","Type":"type","Event":"title","Impact":"impact","Related ref":"related","Who":"who","Details / outcome":"notes"}},
   todo:{sheet:"To-Do List",map:{"Ref":"ref","Package":"pkg","Task":"title","Owner":"owner","Company":"company","Due date":"due","Priority":"priority","Status":"status","Notes":"notes"},alias:{"Who":"owner"}}
 };
-const DATEK=new Set(["identified","original","revised","closedOn","raised","due","date","from","to","week"]);
+const DATEK=new Set(["identified","original","revised","closedOn","raised","due","date","from","to","week","respDate"]);
 const p2=n=>String(n).padStart(2,"0");
 function iso(v){
   if(typeof v==="number"&&v>20000){const d=new Date(Math.round((v-25569)*864e5));return d.getUTCFullYear()+"-"+p2(d.getUTCMonth()+1)+"-"+p2(d.getUTCDate())}
