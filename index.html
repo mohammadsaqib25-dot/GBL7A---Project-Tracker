@@ -546,12 +546,10 @@ const SCHEMA={
   ]},
   rfi:{tab:"RFI",noun:"RFI",letter:"RFI-",closed:"Closed",fields:[
     {k:"pkg",t:"pkg"},{k:"title",t:"text"},{k:"question",t:"area"},
-    {k:"discipline",t:"select",o:["Mechanical","Plumbing","Electrical","Controls / BMS","Structural","Architectural","Process / client","Other"]},
     {k:"raisedBy",t:"text"},{k:"addressee",t:"text"},{k:"raised",t:"date"},{k:"due",t:"date"},{k:"respDate",t:"date"},
     {k:"response",t:"area"},
-    {k:"impact",t:"select",o:["None","Programme","Cost","Programme and cost"]},
     {k:"status",t:"select",o:["Open","Responded","Closed"]},
-    {k:"docref",t:"text"},{k:"comments",t:"area"}
+    {k:"comments",t:"area"}
   ]},
   event:{tab:"Timeline",noun:"event",letter:"E",closed:"__never__",fields:[
     {k:"pkg",t:"pkg"},{k:"date",t:"date"},
@@ -750,16 +748,13 @@ const GRID={
   rfi:[{k:"ref",l:"RFI No.",t:"ro",w:118},PKG,
     {k:"title",l:"Subject",t:"long",w:220},
     {k:"question",l:"Question / description",t:"long",w:300},
-    {k:"discipline",l:"Discipline",t:"select",w:140},
     {k:"raisedBy",l:"Raised by",t:"text",w:130},
     {k:"addressee",l:"Addressed to",t:"text",w:140},
     {k:"raised",l:"Date raised",t:"date",w:136},
     {k:"due",l:"Response due",t:"date",w:136},
     {k:"respDate",l:"Date responded",t:"date",w:136},
     {k:"response",l:"Response",t:"long",w:300},
-    {k:"impact",l:"Impact",t:"select",w:150,vcol:1},
     {k:"status",l:"Status",t:"select",w:118,vcol:1},
-    {k:"docref",l:"Drawing / spec ref",t:"text",w:150},
     {k:"comments",l:"Comments",t:"long",w:220}],
   event:[REF,PKG,
     {k:"date",l:"Date",t:"date",w:136},
@@ -1958,7 +1953,7 @@ const XL={
     alias:{"Ref":"ref","Action":"title","Owner":"owner","Raised at":"source","Date raised":"raised","Due date":"due","Update / comments":"notes","Date closed":"closedOn"}},
   look:{sheet:"Look Ahead",map:{"Ref":"ref","Package":"pkg","Date":"date","Area":"area","Names":"name","Task / work":"title","Comments":"comments"},
     alias:{"Name":"name","From":"from","To":"to","Description of work":"title","Week commencing":"week","Monday":"d1","Tuesday":"d2","Wednesday":"d3","Thursday":"d4","Friday":"d5","Saturday":"d6","Sunday":"d7"}},
-  rfi:{sheet:"RFI Register",map:{"RFI No.":"ref","Package":"pkg","Subject":"title","Question / description":"question","Discipline":"discipline","Raised by":"raisedBy","Addressed to":"addressee","Date raised":"raised","Response due":"due","Date responded":"respDate","Response":"response","Impact":"impact","Status":"status","Drawing / spec ref":"docref","Comments":"comments"},alias:{"RFI":"ref","Ref":"ref","Question":"question","Due":"due"}},
+  rfi:{sheet:"RFI Register",map:{"RFI No.":"ref","Package":"pkg","Subject":"title","Question / description":"question","Raised by":"raisedBy","Addressed to":"addressee","Date raised":"raised","Response due":"due","Date responded":"respDate","Response":"response","Status":"status","Comments":"comments"},alias:{"RFI":"ref","Ref":"ref","Question":"question","Due":"due"}},
   event:{sheet:"Timeline",map:{"Ref":"ref","Package":"pkg","Date":"date","Type":"type","Event":"title","Impact":"impact","Related ref":"related","Who":"who","Details / outcome":"notes"}},
   todo:{sheet:"To-Do List",map:{"Ref":"ref","Package":"pkg","Task":"title","Owner":"owner","Company":"company","Due date":"due","Priority":"priority","Status":"status","Notes":"notes"},alias:{"Who":"owner"}}
 };
