@@ -519,6 +519,7 @@ tr.full .pcw .pbar i{background:var(--ok)} tr.full .pcw b{color:var(--ok)}
 
 <script src="xlsx.full.min.js"></script>
 <script src="jspdf.umd.min.js"></script>
+<script src="exceljs.min.js"></script>
 <script>
 (function(){
 "use strict";
@@ -1728,7 +1729,97 @@ async function exportListXlsx(){
   try{await downloads.save({filename:name,data:buf});toast(`${title} saved as Excel.`)}
   catch(e){if(!(e&&(e.code==="declined"||e.code==="cancelled")))toast("The Excel file could not be created. Try again.")}
 }
-$("listXlsBtn").addEventListener("click",exportListXlsx);
+/* ---------- branded AirconMech Excel template for the register pages ---------- */
+const XLC={pur:"FF832F84",gold:"FFFBB900",lav:"FFEFE3F0",zebra:"FFFAF7FA",line:"FFDACCDA",ink:"FF22152A",mut:"FF66576B",red:"FFF8DFDC",redT:"FFB3352E",amb:"FFFDEFC8",ok:"FFDDEFE3",okT:"FF2C7646",white:"FFFFFFFF",pale:"FFF6E4F7"};
+const XL_RED=["High","Critical","Programme and cost","Issue"], XL_AMB=["Medium","Mitigating","In progress","In Progress","Doing","Responded","Programme","Cost","Slipping"], XL_OK=["Resolved","Closed","Done","Complete","On track"];
+async function exportListXlsxStyled(){
+  if(view==="progress"||view==="dash"||!downloads||!window.ExcelJS)return;
+  const list=filtered(), cfg=LIST_PDF[view];
+  if(!list.length){toast("There is nothing to export with these filters.");return}
+  const btn=$("listXlsBtn");btn.disabled=true;btn.textContent="Preparing Excel…";
+  try{
+    const pk=view==="look"?(lookPkg==="ALL"?"All packages":lookPkg):view==="rfi"?rfiPkg:(pkgFilter==="ALL"?"All packages":pkgLabel(pkgFilter));
+    const title=(view==="rfi"?"RFI Register":cfg.title.split(" – ")[0])+" – "+pk;
+    const notes=[];if(q.trim())notes.push(`search "${q.trim()}"`);if(hideClosed&&view!=="event"&&view!=="look")notes.push("closed items hidden");
+    {const ac=activeCols();if(ac.length)notes.push("filtered by "+ac.map(c=>c.l).join(", "))}
+    const cols=colsFor(view).filter(c=>c.k!=="_sel"), nc=cols.length;
+    const F=a=>({type:"pattern",pattern:"solid",fgColor:{argb:a}});
+    const edge={style:"thin",color:{argb:XLC.line}}, B={top:edge,left:edge,bottom:edge,right:edge};
+    const font=(o)=>Object.assign({name:"Arial",size:10,color:{argb:XLC.ink}},o||{});
+    const wb=new ExcelJS.Workbook();wb.creator="AirconMech project tracker";wb.created=new Date();
+    const ws=wb.addWorksheet(title.replace(/[\\\/?*\[\]:]/g,"-").slice(0,31),{
+      views:[{state:"frozen",ySplit:9,showGridLines:false}],
+      pageSetup:{paperSize:nc>10?8:9,orientation:"landscape",fitToPage:true,fitToWidth:1,fitToHeight:0,margins:{left:.4,right:.4,top:.5,bottom:.6,header:.2,footer:.3}},
+      headerFooter:{oddFooter:`&L&8AirconMech  |  ${title.replace(/&/g,"&&")}  |  ${(projectName||"").replace(/&/g,"&&")}&R&8Page &P of &N`}});
+    ws.columns=cols.map(c=>({width:Math.max(11,Math.min(60,Math.round(colW(view,c)/7)))}));
+    // purple brand band with the logo, gold line underneath
+    [1,2,3].forEach(r=>{ws.getRow(r).height=r===1?32:20;for(let c=1;c<=nc;c++)ws.getCell(r,c).fill=F(XLC.pur)});
+    ws.getRow(4).height=5;for(let c=1;c<=nc;c++)ws.getCell(4,c).fill=F(XLC.gold);
+    const tc=Math.min(3,nc);
+    [1,2,3].forEach(r=>{if(nc>tc)ws.mergeCells(r,tc,r,nc)});
+    Object.assign(ws.getCell(1,tc),{value:title,font:font({size:18,bold:true,color:{argb:XLC.white}}),alignment:{vertical:"middle"}});
+    Object.assign(ws.getCell(2,tc),{value:[projectName||"","Issued "+fmtDMY(today())].concat(notes).filter(Boolean).join("   |   "),font:font({color:{argb:XLC.pale}}),alignment:{vertical:"middle"}});
+    Object.assign(ws.getCell(3,tc),{value:"Enhancing Environments. Advancing Engineering.",font:font({size:9,italic:true,color:{argb:XLC.gold}}),alignment:{vertical:"top"}});
+    try{const lg=await logoForPdf();const id=wb.addImage({base64:lg.data,extension:lg.fmt==="JPEG"?"jpeg":"png"});
+      const h=84, w=Math.min(200,Math.round(h*lg.w/lg.h));ws.addImage(id,{tl:{col:0.12,row:0.12},ext:{width:w,height:Math.round(w*lg.h/lg.w)}})}catch(e){}
+    // key figures
+    ws.getRow(5).height=8;ws.getRow(6).height=22;ws.getRow(7).height=24;ws.getRow(8).height=8;
+    cfg.summary(list).slice(0,nc).forEach(([lab,val],k)=>{
+      const thick={left:{style:"thick",color:{argb:XLC.pur}}};
+      Object.assign(ws.getCell(6,k+1),{value:lab,font:font({size:8,color:{argb:XLC.mut}}),fill:F(XLC.lav),alignment:{vertical:"bottom",wrapText:true},border:thick});
+      Object.assign(ws.getCell(7,k+1),{value:val,font:font({size:13,bold:true,color:{argb:XLC.pur}}),fill:F(XLC.lav),alignment:{horizontal:"left",vertical:"top",wrapText:true},border:thick});
+    });
+    // column headings
+    const H=9, hr=ws.getRow(H);hr.height=30;
+    cols.forEach((c,k)=>Object.assign(hr.getCell(k+1),{value:c.l,font:font({bold:true}),fill:F(XLC.gold),alignment:{vertical:"middle",wrapText:true},border:B}));
+    const choices=c=>c.t==="select"?opt(view,c.k):c.t==="pkg"?PKGS.map(p=>p.id):null;
+    const dv=c=>{const o=choices(c);return o&&o.length&&o.join(",").length<250?{type:"list",allowBlank:true,formulae:['"'+o.join(",")+'"']}:null};
+    const d8=s=>{const m=String(s||"").match(/^(\d{4})-(\d{2})-(\d{2})/);return m?new Date(Date.UTC(+m[1],m[2]-1,+m[3])):null};
+    const val=(i,c)=>{
+      if(c.t==="date")return d8(i[c.k]);
+      if(c.t==="names")return namesOf(i).join(", ")||null;
+      if(c.k==="_slip"){const s=slip(i);return s==null?null:s}
+      if(c.t==="ro")return colText(i,c)||null;
+      if(c.k==="pkg")return pkgShort(i.pkg);
+      const v=i[c.k];return v==null||v===""?null:v;
+    };
+    // register rows
+    list.forEach((i,n)=>{
+      const r=ws.getRow(H+1+n), closed=view!=="event"&&view!=="look"&&isClosed(i);let lines=1;
+      cols.forEach((c,k)=>{
+        const cell=r.getCell(k+1), v=val(i,c);cell.value=v;
+        cell.font=font({bold:k===0,color:{argb:closed?XLC.mut:XLC.ink}});
+        cell.alignment={vertical:"top",wrapText:true};cell.border=B;
+        if(c.t==="date")cell.numFmt="dd/mm/yyyy";
+        if(n%2)cell.fill=F(XLC.zebra);
+        const st=(c.vcol||c.k==="status"||c.k==="_ast")&&typeof v==="string"?v:"";
+        if(st){
+          if(XL_RED.includes(st)||(st==="Open"&&overdue(i))){cell.fill=F(XLC.red);cell.font=font({bold:true,color:{argb:XLC.redT}})}
+          else if(XL_AMB.includes(st))cell.fill=F(XLC.amb);
+          else if(XL_OK.includes(st)){cell.fill=F(XLC.ok);cell.font=font({color:{argb:XLC.okT}})}
+        }
+        if(c.k==="due"&&overdue(i))cell.font=font({bold:true,color:{argb:XLC.redT}});
+        const d=dv(c);if(d)cell.dataValidation=d;
+        if(typeof v==="string"){const w=Math.max(8,Math.round(colW(view,c)/7)-2);lines=Math.max(lines,v.split("\n").reduce((s,p)=>s+Math.max(1,Math.ceil(p.length/w)),0))}
+      });
+      r.height=Math.max(18,Math.min(400,lines*13+5));
+    });
+    // 20 blank, formatted rows ready for new entries in Excel
+    const end=H+list.length;
+    for(let n=1;n<=20;n++){const r=ws.getRow(end+n);r.height=18;
+      cols.forEach((c,k)=>{const cell=r.getCell(k+1);cell.border=B;cell.font=font();cell.alignment={vertical:"top",wrapText:true};
+        if(c.t==="date")cell.numFmt="dd/mm/yyyy";const d=dv(c);if(d)cell.dataValidation=d})}
+    ws.autoFilter={from:{row:H,column:1},to:{row:end,column:nc}};
+    ws.pageSetup.printTitlesRow=`${H}:${H}`;
+    const out=await wb.xlsx.writeBuffer();
+    const buf=out instanceof ArrayBuffer?out:out.buffer.slice(out.byteOffset,out.byteOffset+out.byteLength);
+    const name=[projectName||"Project",title,today()].join(" ").replace(/[\/\\]/g,"-").replace(/[–—]/g,"-").replace(/[^\w\-. ]+/g,"").replace(/\s+/g," ").trim()+".xlsx";
+    await downloads.save({filename:name,data:buf});
+    toast(`${title} saved as Excel.`);
+  }catch(e){if(!(e&&(e.code==="declined"||e.code==="cancelled")))toast("The Excel file could not be created. Try again.")}
+  finally{btn.disabled=false;btn.textContent="Download Excel"}
+}
+$("listXlsBtn").addEventListener("click",()=>window.ExcelJS?exportListXlsxStyled():exportListXlsx());
 
 async function exportPdf(){
   const P=getProg(progPkg);if(!P||!downloads||!window.jspdf)return;

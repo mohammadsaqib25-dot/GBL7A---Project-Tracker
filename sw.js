@@ -1,6 +1,6 @@
 // Keeps the tracker working offline. Bump the version when you upload new files.
-const CACHE = "project-tracker-v32";
-const FILES = ["./", "index.html", "manifest.webmanifest", "xlsx.full.min.js", "jspdf.umd.min.js", "icon-192.png", "icon-512.png", "apple-touch-icon.png"];
+const CACHE = "project-tracker-v33";
+const FILES = ["./", "index.html", "manifest.webmanifest", "xlsx.full.min.js", "jspdf.umd.min.js", "exceljs.min.js", "icon-192.png", "icon-512.png", "apple-touch-icon.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener("activate", e => {
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))));
